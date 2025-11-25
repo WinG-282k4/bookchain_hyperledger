@@ -1,0 +1,18 @@
+[
+  {
+    "id": "1764075347415",
+    "username": "admin01",
+    "password": "$2a$10$ubUm5Lj5QfA/KCBA0M/OBe5m7w/5h7IRuenFX8DoYy6bk9H/1lGTO",
+    "role": "Admin",
+    "fullName": "",
+    "fabricId": "sv102220126"
+  },
+  {
+    "id": "1764075769843",
+    "username": "user01",
+    "password": "$2a$10$9Id.CdzNNd3LHeTbq13cgOKMctNySa0RGnfTH45AA35ytQ01culQi",
+    "role": "User",
+    "fullName": "",
+    "fabricId": "sv102220126"
+  }
+]
