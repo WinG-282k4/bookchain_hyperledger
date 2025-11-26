@@ -21,6 +21,9 @@ function App() {
             <p className="mb-0">Powered by Hyperledger Fabric & React.js</p>
           </div>
           <div>
+            <a className="btn btn-light btn-sm me-2" href="/">
+              Trang chu
+            </a>
             {user ? (
               <>
                 <span className="me-2">Xin chao, {user.username}</span>

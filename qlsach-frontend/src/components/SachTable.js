@@ -367,60 +367,62 @@ const SachTable = () => {
         </Col>
 
         <Col md={4} className="text-end">
-          {/* Back to home */}
-          <Button
-            variant="light"
-            className="me-2"
-            onClick={() => (window.location.href = "/")}
-          >
-            Quay ve trang chu
-          </Button>
+          {/* Home button moved to top navigation */}
 
-          {/* Import/Export controls */}
-          <input
-            id="import-file"
-            type="file"
-            accept=".csv,text/csv"
-            style={{ display: "none" }}
-            onChange={async (e) => {
-              const file = e.target.files[0];
-              if (!file) return;
-              const text = await file.text();
-              const rows = parseCSV(text);
-              // expect header: maSach,tenSach,theLoai,tacGia,namXuatBan,soLuong
-              for (const row of rows) {
-                const item = {
-                  maSach: row.maSach || row.MaSach || row["maSach"] || "",
-                  tenSach: row.tenSach || row.TenSach || row["tenSach"] || "",
-                  theLoai: row.theLoai || row.TheLoai || row["theLoai"] || "",
-                  tacGia: row.tacGia || row.TacGia || row["tacGia"] || "",
-                  namXuatBan:
-                    row.namXuatBan || row.NamXB || row["namXuatBan"] || "",
-                  soLuong: row.soLuong || row.SoLuong || row["soLuong"] || 0,
-                };
-                try {
-                  const exists = sachs.find((s) => s.maSach === item.maSach);
-                  if (exists) {
-                    await sachAPI.updateSach(item.maSach, item);
-                  } else {
-                    await sachAPI.createSach(item);
+          {/* Import (only for write roles) and Export controls */}
+          {canWrite && (
+            <>
+              <input
+                id="import-file"
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: "none" }}
+                onChange={async (e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  const text = await file.text();
+                  const rows = parseCSV(text);
+                  // expect header: maSach,tenSach,theLoai,tacGia,namXuatBan,soLuong
+                  for (const row of rows) {
+                    const item = {
+                      maSach: row.maSach || row.MaSach || row["maSach"] || "",
+                      tenSach:
+                        row.tenSach || row.TenSach || row["tenSach"] || "",
+                      theLoai:
+                        row.theLoai || row.TheLoai || row["theLoai"] || "",
+                      tacGia: row.tacGia || row.TacGia || row["tacGia"] || "",
+                      namXuatBan:
+                        row.namXuatBan || row.NamXB || row["namXuatBan"] || "",
+                      soLuong:
+                        row.soLuong || row.SoLuong || row["soLuong"] || 0,
+                    };
+                    try {
+                      const exists = sachs.find(
+                        (s) => s.maSach === item.maSach
+                      );
+                      if (exists) {
+                        await sachAPI.updateSach(item.maSach, item);
+                      } else {
+                        await sachAPI.createSach(item);
+                      }
+                    } catch (err) {
+                      console.error("Import error for", item, err);
+                    }
                   }
-                } catch (err) {
-                  console.error("Import error for", item, err);
-                }
-              }
-              fetchSachs();
-              e.target.value = null;
-            }}
-          />
-          <Button
-            variant="outline-secondary"
-            className="me-2"
-            onClick={() => document.getElementById("import-file").click()}
-            disabled={!canWrite}
-          >
-            Import CSV
-          </Button>
+                  fetchSachs();
+                  e.target.value = null;
+                }}
+              />
+              <Button
+                variant="outline-secondary"
+                className="me-2"
+                onClick={() => document.getElementById("import-file").click()}
+              >
+                Import CSV
+              </Button>
+            </>
+          )}
+
           <Button
             variant="outline-primary"
             className="me-2"
@@ -446,7 +448,7 @@ const SachTable = () => {
             Export PDF
           </Button>
 
-          {canWrite ? (
+          {canWrite && (
             <>
               <Button
                 variant="warning"
@@ -464,8 +466,6 @@ const SachTable = () => {
                 Them Moi
               </Button>
             </>
-          ) : (
-            <div className="text-muted">Chi xem (khong co quyen chinh sua)</div>
           )}
         </Col>
       </Row>
@@ -507,7 +507,7 @@ const SachTable = () => {
                     <td>{sach.namXuatBan}</td>
                     <td>{sach.soLuong}</td>
                     <td className="text-center">
-                      {canWrite ? (
+                      {canWrite && (
                         <>
                           <Button
                             variant="outline-primary"
@@ -525,8 +525,6 @@ const SachTable = () => {
                             Xoa
                           </Button>
                         </>
-                      ) : (
-                        <small className="text-muted">Khong co quyen</small>
                       )}
                     </td>
                   </tr>
