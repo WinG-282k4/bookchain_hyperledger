@@ -50,6 +50,12 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  // Continue as guest (no authentication)
+  const continueAsGuest = () => {
+    const guest = { username: "Guest", role: "Guest", token: null };
+    setUser(guest);
+  };
+
   // Kiem tra quyen: requiredRoles la mang, vi du: ['Admin', 'Manager']
   const isAuthorized = (requiredRoles) => {
     // Neu khong co yeu cau quyen co the, luon tra ve true (nhu Guest)
@@ -61,7 +67,15 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, isAuthorized, loading, authError }}
+      value={{
+        user,
+        login,
+        logout,
+        isAuthorized,
+        loading,
+        authError,
+        continueAsGuest,
+      }}
     >
       {children}
     </AuthContext.Provider>

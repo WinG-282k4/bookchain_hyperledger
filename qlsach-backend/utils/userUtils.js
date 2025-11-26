@@ -33,6 +33,14 @@ const findUserByUsername = (username) => {
   return users.find((user) => user.username === username);
 };
 
+const findUserByEmail = (email) => {
+  if (!email) return null;
+  const users = readUsers();
+  return users.find(
+    (user) => user.email && user.email.toLowerCase() === email.toLowerCase()
+  );
+};
+
 const findUserById = (id) => {
   const users = readUsers();
   return users.find((user) => user.id === id);
@@ -51,6 +59,7 @@ const createUser = async (userData) => {
     role: userData.role || "User",
     fullName: userData.fullName || "",
     fabricId: userData.fabricId, // <-- fabricId
+    email: userData.email || "",
   };
 
   users.push(newUser);
@@ -64,10 +73,42 @@ const matchPassword = async (enteredPassword, hashedPassword) => {
   return await bcrypt.compare(enteredPassword, hashedPassword);
 };
 
+const setResetToken = (userId, token, expiry) => {
+  const users = readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) return false;
+  users[idx].resetToken = token;
+  users[idx].resetTokenExpiry = expiry;
+  writeUsers(users);
+  return true;
+};
+
+const findUserByResetToken = (token) => {
+  if (!token) return null;
+  const users = readUsers();
+  return users.find((u) => u.resetToken === token);
+};
+
+const updatePasswordById = async (userId, newPassword) => {
+  const users = readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) return false;
+  const hashed = await bcrypt.hash(newPassword, 10);
+  users[idx].password = hashed;
+  delete users[idx].resetToken;
+  delete users[idx].resetTokenExpiry;
+  writeUsers(users);
+  return true;
+};
+
 module.exports = {
   findUserByUsername,
   findUserById,
+  findUserByEmail,
   createUser,
   matchPassword,
   readUsers,
+  setResetToken,
+  findUserByResetToken,
+  updatePasswordById,
 };

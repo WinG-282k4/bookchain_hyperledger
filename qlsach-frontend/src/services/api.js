@@ -1,94 +1,139 @@
-import axios from 'axios';
+import axios from "axios";
 
-// Su dung proxy trong development de tranh CORS
-const API_BASE_URL = 'http://192.168.31.60:3006/api';
+// Cau hinh URL co so API
+// Trong moi truong development, se dung proxy (neu duoc cau hinh trong package.json)
+// Trong moi truong production, su dung dia chi backend
+const API_BASE_URL =
+  process.env.NODE_ENV === "development"
+    ? "/api"
+    : "http://192.168.31.60:3006/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 10000, // 10 seconds timeout
+  headers: { "Content-Type": "application/json" },
+  timeout: 10000,
 });
 
-// Request interceptor de log requests
-api.interceptors.request.use(
+// Auth client: goi /auth/* (khong bi prefix /api)
+const AUTH_BASE_URL = "http://192.168.31.60:3006";
+
+const authClient = axios.create({
+  baseURL: AUTH_BASE_URL,
+  headers: { "Content-Type": "application/json" },
+  timeout: 10000,
+});
+
+// Interceptor cho authClient de logging
+authClient.interceptors.request.use(
   (config) => {
-    console.log(`?? API Call: ${config.method?.toUpperCase()} ${config.url}`);
+    console.log(
+      `-> Auth Request: ${config.method?.toUpperCase()} ${config.baseURL}${
+        config.url
+      }`
+    );
     return config;
   },
   (error) => {
-    console.error('? Request Error:', error);
+    console.error("Auth request error:", error);
     return Promise.reject(error);
   }
 );
 
-// Response interceptor de xu ly loi
-api.interceptors.response.use(
+authClient.interceptors.response.use(
   (response) => {
-    console.log(`? API Success: ${response.status} ${response.config.url}`);
+    console.log(`<-- Auth Response: ${response.status} ${response.config.url}`);
     return response;
   },
   (error) => {
-    console.error('? API Error:', error);
-    
-    if (error.code === 'ECONNREFUSED') {
-      error.message = 'Khong the ket noi den server. Kiem tra xem API server co dang chay khong?';
-    } else if (error.message.includes('Network Error')) {
-      error.message = 'Loi ket noi mang. Kiem tra ket noi internet va server.';
-    } else if (error.response) {
-      error.message = `Server error: ${error.response.status} - ${error.response.data?.error || error.response.statusText}`;
-    } else if (error.request) {
-      error.message = 'Khong nhan duoc phan hoi tu server.';
-    }
-    
+    console.error(
+      "Auth response error:",
+      error.response || error.message || error
+    );
     return Promise.reject(error);
   }
 );
 
-// Test ket noi den server
-const testConnection = async () => {
-  try {
-    const response = await api.get('/health');
-    return { success: true, data: response.data };
-  } catch (error) {
-    return { 
-      success: false, 
-      error: error.message,
-      details: 'Hay chac chan rang API server dang chay tren port 3006'
-    };
+// ===============================================
+// 1. INTERCEPTOR - GAN TOKEN CHO MOI REQUEST NGHIEP VU
+// ===============================================
+api.interceptors.request.use(
+  (config) => {
+    const user = localStorage.getItem("user");
+    const token = user ? JSON.parse(user).token : null;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    console.log(`--> API Call: ${config.method?.toUpperCase()} ${config.url}`);
+    return config;
+  },
+  (error) => {
+    console.error("API Request Error:", error);
+    return Promise.reject(error);
   }
+);
+
+// ===============================================
+// 2. INTERCEPTOR - XU LY LOI PHAN HOI
+// ===============================================
+api.interceptors.response.use(
+  (response) => {
+    console.log(`<- API Success: ${response.status} ${response.config.url}`);
+    return response;
+  },
+  (error) => {
+    console.error("API Error:", error);
+    let message = "Loi ket noi server.";
+
+    if (error.response) {
+      const status = error.response.status;
+      const errorMsg = error.response.data?.error || error.response.statusText;
+
+      if (status === 401 || status === 403) {
+        message = `Truy cap bi tu choi (${status}). Vui long dang nhap lai hoac kiem tra quyen.`;
+      } else if (status === 400) {
+        message = `Yeu cau khong hop le: ${errorMsg}`;
+      } else {
+        message = `Server error: ${status} - ${errorMsg}`;
+      }
+    } else if (error.request) {
+      message =
+        "Khong nhan duoc phan hoi tu server. Kiem tra ket noi hoac API server.";
+    }
+
+    error.message = message;
+    return Promise.reject(error);
+  }
+);
+
+// ===============================================
+// 3. API DICH VU XAC THUC (AUTH API)
+// ===============================================
+export const authAPI = {
+  // Goi endpoint /auth/login (Khong can Token)
+  login: (username, password) =>
+    authClient.post("/auth/login", { username, password }),
+  // Goi endpoint /auth/register (Khong can Token)
+  register: (data) => authClient.post("/auth/register", data),
+  // Request password reset (provide email)
+  requestReset: (email) => authClient.post("/auth/request-reset", { email }),
+  // Reset password with token
+  resetPassword: (token, newPassword) =>
+    authClient.post("/auth/reset", { token, newPassword }),
 };
 
-// API Service
+// ===============================================
+// 4. API DICH VU NGHIEP VU (SACH API)
+// ===============================================
 export const sachAPI = {
-  // Khoi tao du lieu
-  initData: () => api.post('/init'),
-  
-  // Lay tat ca sach
-  getAllSach: () => api.get('/sach'),
-  
-  // Lay sach theo ma
+  initData: () => api.post("/init"),
+  getAllSach: () => api.get("/sach"),
   getSachByMa: (maSach) => api.get(`/sach/${maSach}`),
-  
-  // Tao sach moi
-  createSach: (data) => api.post('/sach', data),
-  
-  // Cap nhat sach
+  createSach: (data) => api.post("/sach", data),
   updateSach: (maSach, data) => api.put(`/sach/${maSach}`, data),
-  
-  // Xoa sach
   deleteSach: (maSach) => api.delete(`/sach/${maSach}`),
-  
-  // Tim sach theo the loai
   getSachByTheLoai: (theLoai) => api.get(`/sach/theloai/${theLoai}`),
-  
-  // Cap nhat so luong sach
-  updateSoLuongSach: (maSach, soLuongMoi) => api.patch(`/sach/${maSach}/soluong`, { soLuongMoi }),
-
-  // Test connection
-  testConnection: testConnection
+  updateSoLuongSach: (maSach, soLuongMoi) =>
+    api.patch(`/sach/${maSach}/soluong`, { soLuongMoi }),
 };
 
-export { testConnection };
 export default api;
