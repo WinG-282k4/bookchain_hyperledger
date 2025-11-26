@@ -2,8 +2,11 @@ import React from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import SachTable from "./components/SachTable";
 import Login from "./components/Login";
+import Register from "./components/Register";
+import ChangePassword from "./components/ChangePassword";
 import RequestReset from "./components/RequestReset";
 import ResetPassword from "./components/ResetPassword";
+import Profile from "./components/Profile";
 import "./App.css";
 import { useAuth } from "./context/AuthContext";
 
@@ -21,6 +24,15 @@ function App() {
             {user ? (
               <>
                 <span className="me-2">Xin chao, {user.username}</span>
+                <a className="btn btn-light btn-sm me-2" href="/profile">
+                  Ho so
+                </a>
+                <a
+                  className="btn btn-light btn-sm me-2"
+                  href="/change-password"
+                >
+                  Doi mk
+                </a>
                 <button
                   className="btn btn-light btn-sm"
                   onClick={() => {
@@ -32,9 +44,14 @@ function App() {
                 </button>
               </>
             ) : (
-              <a className="btn btn-light btn-sm" href="/login">
-                Dang nhap
-              </a>
+              <>
+                <a className="btn btn-light btn-sm me-2" href="/register">
+                  Dang ky
+                </a>
+                <a className="btn btn-light btn-sm" href="/login">
+                  Dang nhap
+                </a>
+              </>
             )}
           </div>
         </div>
@@ -42,8 +59,11 @@ function App() {
 
       {/* Simple client-side routing based on path */}
       {window.location.pathname === "/login" && <Login />}
+      {window.location.pathname === "/register" && <Register />}
       {window.location.pathname === "/request-reset" && <RequestReset />}
       {window.location.pathname === "/reset" && <ResetPassword />}
+      {window.location.pathname === "/profile" && <Profile />}
+      {window.location.pathname === "/change-password" && <ChangePassword />}
       {window.location.pathname === "/" && <SachTable />}
       {/* Fallback: show SachTable */}
       {["/home", ""].includes(window.location.pathname) &&

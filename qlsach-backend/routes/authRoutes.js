@@ -9,6 +9,8 @@ const {
   setResetToken,
   findUserByResetToken,
   updatePasswordById,
+  findUserById,
+  updateProfileById,
 } = require("../utils/userUtils");
 
 const router = express.Router();
@@ -169,6 +171,131 @@ router.post("/login", async (req, res) => {
   } catch (error) {
     console.error("Loi dang nhap:", error);
     res.status(500).json({ success: false, error: "Loi server noi bo" });
+  }
+});
+
+// GET /auth/me - return current user profile (requires Bearer token)
+router.get("/me", (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader)
+      return res.status(401).json({ success: false, error: "No token" });
+    const token = authHeader.split(" ")[1];
+    if (!token)
+      return res.status(401).json({ success: false, error: "Invalid token" });
+
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+
+    const user = findUserById(payload.id);
+    if (!user)
+      return res.status(404).json({ success: false, error: "User not found" });
+
+    const { password, resetToken, resetTokenExpiry, ...safe } = user;
+    return res.status(200).json({ success: true, data: safe });
+  } catch (error) {
+    console.error("Error /auth/me:", error);
+    return res.status(500).json({ success: false, error: "Server error" });
+  }
+});
+
+// PUT /auth/me - update profile (requires Bearer token)
+router.put("/me", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader)
+      return res.status(401).json({ success: false, error: "No token" });
+    const token = authHeader.split(" ")[1];
+    if (!token)
+      return res.status(401).json({ success: false, error: "Invalid token" });
+
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+
+    const user = findUserById(payload.id);
+    if (!user)
+      return res.status(404).json({ success: false, error: "User not found" });
+
+    const { username, email, fullName, sdt } = req.body;
+
+    // Update profile fields (do NOT update password here)
+    const updated = {};
+    if (username) updated.username = username;
+    if (email) updated.email = email;
+    if (fullName) updated.fullName = fullName;
+    if (sdt) updated.sdt = sdt;
+
+    const ok = updateProfileById(user.id, updated);
+    if (!ok)
+      return res
+        .status(500)
+        .json({ success: false, error: "Could not update profile" });
+
+    const fresh = findUserById(user.id);
+    const { password: pwd, resetToken, resetTokenExpiry, ...safe } = fresh;
+    return res.status(200).json({ success: true, data: safe });
+  } catch (error) {
+    console.error("Error PUT /auth/me:", error);
+    return res.status(500).json({ success: false, error: "Server error" });
+  }
+});
+
+// POST /auth/change-password - require oldPassword + newPassword, token required
+router.post("/change-password", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader)
+      return res.status(401).json({ success: false, error: "No token" });
+    const token = authHeader.split(" ")[1];
+    if (!token)
+      return res.status(401).json({ success: false, error: "Invalid token" });
+
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ success: false, error: "Invalid token" });
+    }
+
+    const user = findUserById(payload.id);
+    if (!user)
+      return res.status(404).json({ success: false, error: "User not found" });
+
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          error: "oldPassword and newPassword are required",
+        });
+    }
+
+    // verify old password
+    const okMatch = await matchPassword(oldPassword, user.password);
+    if (!okMatch)
+      return res
+        .status(400)
+        .json({ success: false, error: "Old password is incorrect" });
+
+    const ok = await updatePasswordById(user.id, newPassword);
+    if (!ok)
+      return res
+        .status(500)
+        .json({ success: false, error: "Could not update password" });
+
+    return res.status(200).json({ success: true, message: "Password changed" });
+  } catch (error) {
+    console.error("Error POST /auth/change-password:", error);
+    return res.status(500).json({ success: false, error: "Server error" });
   }
 });
 

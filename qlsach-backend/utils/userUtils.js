@@ -101,6 +101,23 @@ const updatePasswordById = async (userId, newPassword) => {
   return true;
 };
 
+const updateProfileById = (userId, updates = {}) => {
+  const users = readUsers();
+  const idx = users.findIndex((u) => u.id === userId);
+  if (idx === -1) return false;
+
+  // Only allow certain fields to be updated
+  const allowed = ["username", "email", "fullName", "sdt"];
+  allowed.forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(updates, field)) {
+      users[idx][field] = updates[field];
+    }
+  });
+
+  writeUsers(users);
+  return true;
+};
+
 module.exports = {
   findUserByUsername,
   findUserById,
@@ -111,4 +128,5 @@ module.exports = {
   setResetToken,
   findUserByResetToken,
   updatePasswordById,
+  updateProfileById,
 };

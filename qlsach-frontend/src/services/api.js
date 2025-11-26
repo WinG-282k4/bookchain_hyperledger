@@ -31,6 +31,14 @@ authClient.interceptors.request.use(
         config.url
       }`
     );
+    // attach token from localStorage if present
+    try {
+      const user = localStorage.getItem("user");
+      const token = user ? JSON.parse(user).token : null;
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+    } catch (e) {
+      // ignore
+    }
     return config;
   },
   (error) => {
@@ -120,6 +128,11 @@ export const authAPI = {
   // Reset password with token
   resetPassword: (token, newPassword) =>
     authClient.post("/auth/reset", { token, newPassword }),
+  // Profile endpoints (require Authorization)
+  getProfile: () => authClient.get("/auth/me"),
+  updateProfile: (data) => authClient.put("/auth/me", data),
+  changePassword: (oldPassword, newPassword) =>
+    authClient.post("/auth/change-password", { oldPassword, newPassword }),
 };
 
 // ===============================================
