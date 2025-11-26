@@ -11,6 +11,7 @@ const fs = require("fs");
 // Import Middleware va Routes moi
 const { protect, authorize } = require("./middleware/authMiddleware");
 const authRoutes = require("./routes/authRoutes");
+const reportRoutes = require("./routes/reportRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -64,6 +65,9 @@ async function connectToNetwork(fabricId) {
 
 // 1. Route dang ky/dang nhap (Khong can bao ve)
 app.use("/auth", authRoutes);
+
+// report/dashboard endpoints (some protected)
+app.use("/api", reportRoutes);
 
 // BO DUNG: app.use('/api', protect);
 // Ap dung bao ve rieng cho cac route ben duoi
@@ -175,13 +179,11 @@ app.post("/api/sach", adminManagerAuth, async (req, res) => {
       soLuong.toString()
     );
 
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: `Da tao sach ${maSach} thanh cong`,
-        data: { maSach, tenSach, theLoai, tacGia, namXuatBan, soLuong },
-      });
+    res.status(201).json({
+      success: true,
+      message: `Da tao sach ${maSach} thanh cong`,
+      data: { maSach, tenSach, theLoai, tacGia, namXuatBan, soLuong },
+    });
   } catch (error) {
     console.error(`Failed to create book: ${error}`);
     res.status(500).json({ success: false, error: error.message });
@@ -211,13 +213,11 @@ app.put("/api/sach/:maSach", adminManagerAuth, async (req, res) => {
       namXuatBan,
       soLuong.toString()
     );
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: `Da cap nhat sach ${maSach} thanh cong`,
-        data: { maSach, tenSach, theLoai, tacGia, namXuatBan, soLuong },
-      });
+    res.status(200).json({
+      success: true,
+      message: `Da cap nhat sach ${maSach} thanh cong`,
+      data: { maSach, tenSach, theLoai, tacGia, namXuatBan, soLuong },
+    });
   } catch (error) {
     console.error(`Failed to update book: ${error}`);
     res.status(500).json({ success: false, error: error.message });
@@ -243,12 +243,10 @@ app.patch("/api/sach/:maSach/soluong", adminManagerAuth, async (req, res) => {
       maSach,
       soLuongMoi.toString()
     );
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: `Da cap nhat so luong sach ${maSach} thanh ${soLuongMoi} thanh cong`,
-      });
+    res.status(200).json({
+      success: true,
+      message: `Da cap nhat so luong sach ${maSach} thanh ${soLuongMoi} thanh cong`,
+    });
   } catch (error) {
     console.error(`Failed to update book quantity: ${error}`);
     res.status(500).json({ success: false, error: error.message });
@@ -328,3 +326,13 @@ app.listen(PORT, () => {
     `\n*** User data is stored in users.json (using fabricId for Hyperledger identity) ***\n`
   );
 });
+
+// start scheduled report jobs (optional - requires node-cron installed)
+try {
+  require("./jobs/reportCron");
+} catch (e) {
+  console.log(
+    "Report cron not started (missing dependency or file):",
+    e.message
+  );
+}

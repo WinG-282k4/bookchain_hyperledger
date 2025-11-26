@@ -1,6 +1,8 @@
 import React from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import SachTable from "./components/SachTable";
+import Dashboard from "./components/Dashboard";
+import Reports from "./components/Reports";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import ChangePassword from "./components/ChangePassword";
@@ -23,6 +25,12 @@ function App() {
           <div>
             <a className="btn btn-light btn-sm me-2" href="/">
               Trang chu
+            </a>
+            <a className="btn btn-light btn-sm me-2" href="/dashboard">
+              Dashboard
+            </a>
+            <a className="btn btn-light btn-sm me-2" href="/reports">
+              Reports
             </a>
             {user ? (
               <>
@@ -61,6 +69,8 @@ function App() {
       </div>
 
       {/* Simple client-side routing based on path */}
+      {window.location.pathname === "/dashboard" && <Dashboard />}
+      {window.location.pathname === "/reports" && <Reports />}
       {window.location.pathname === "/login" && <Login />}
       {window.location.pathname === "/register" && <Register />}
       {window.location.pathname === "/request-reset" && <RequestReset />}

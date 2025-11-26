@@ -102,3 +102,46 @@ cd ..\qlsach-frontend; npm install; npm start
 ```
 
 ---
+
+## Dashboard, Báo cáo định kỳ, Biểu đồ, Xuất báo cáo
+
+Trong phiên bản này có một prototype báo cáo và dashboard cơ bản. Phần này mô tả chức năng, API liên quan và cách kiểm tra nhanh.
+
+### 1) Mô tả chức năng
+
+- **Dashboard**: trang tổng quan hiển thị KPI (số tựa sách, tổng tồn kho, top thể loại/tác giả) và biểu đồ.
+- **Báo cáo định kỳ**: job cron sinh báo cáo hàng ngày và lưu file vào `qlsach-backend/reports/`.
+- **Tạo báo cáo theo yêu cầu**: Admin/Manager có thể tạo báo cáo bằng API hoặc trang `Reports`.
+- **Xuất báo cáo**: file `.xlsx` nếu cài `xlsx` (SheetJS), ngược lại tạo `.csv`.
+
+### 2) API mới (đặt dưới `/api`)
+
+- `GET /api/dashboard/metrics?period=daily` — trả về KPI cho Dashboard (guest có thể truy vấn).
+- `POST /api/reports/generate` — tạo báo cáo theo yêu cầu (yêu cầu JWT + role Admin/Manager). Body: `{ type, format, period, from, to }`.
+- `GET /api/reports` — danh sách báo cáo (Admin/Manager).
+- `GET /api/reports/:id/download` — tải file báo cáo (Admin/Manager).
+
+### 3) Cài đặt phụ thuộc bổ sung
+
+- Backend (thư mục `qlsach-backend`):
+
+```powershell
+cd qlsach-backend
+npm install node-cron xlsx
+```
+
+- Frontend (thư mục `qlsach-frontend`):
+
+```powershell
+cd qlsach-frontend
+npm install recharts
+```
+
+### 5) Vị trí file & metadata
+
+- Reports lưu tại: `qlsach-backend/reports/`.
+- Metadata tại: `qlsach-backend/reports/index.json`.
+
+### 6) Bảo mật & Quyền
+
+- Các endpoint tạo/liệt kê/tải báo cáo được bảo vệ bằng middleware `protect` và `authorize('Admin','Manager')`. Đảm bảo JWT và role được cấu hình đúng.
