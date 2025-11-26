@@ -189,6 +189,143 @@ const SachTable = () => {
     }
   };
 
+  // ---------------------- Import / Export Helpers ----------------------
+  const parseCSV = (text) => {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
+    if (lines.length === 0) return [];
+    const headers = lines[0].split(",").map((h) => h.trim());
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      const values = [];
+      let cur = "";
+      let inQuotes = false;
+      for (let chIndex = 0; chIndex < line.length; chIndex++) {
+        const ch = line[chIndex];
+        if (ch === '"') {
+          inQuotes = !inQuotes;
+        } else if (ch === "," && !inQuotes) {
+          values.push(cur);
+          cur = "";
+        } else {
+          cur += ch;
+        }
+      }
+      values.push(cur);
+      const obj = {};
+      headers.forEach((h, idx) => {
+        obj[h] = values[idx] ? values[idx].trim().replace(/^"|"$/g, "") : "";
+      });
+      rows.push(obj);
+    }
+    return rows;
+  };
+
+  const downloadBlob = (content, filename, mime) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportCSV = (data) => {
+    if (!data || data.length === 0) return;
+    const headers = [
+      "maSach",
+      "tenSach",
+      "theLoai",
+      "tacGia",
+      "namXuatBan",
+      "soLuong",
+    ];
+    const lines = [headers.join(",")];
+    data.forEach((d) => {
+      const row = headers.map((h) => {
+        const val = d[h] == null ? "" : String(d[h]);
+        return val.includes(",") || val.includes('"')
+          ? `"${val.replace(/"/g, '""')}"`
+          : val;
+      });
+      lines.push(row.join(","));
+    });
+    downloadBlob(
+      lines.join("\r\n"),
+      `sachs_export_${Date.now()}.csv`,
+      "text/csv;charset=utf-8;"
+    );
+  };
+
+  const exportExcel = (data) => {
+    // lightweight Excel export: HTML table saved as .xls
+    if (!data || data.length === 0) return;
+    const headers = [
+      "Ma Sach",
+      "Ten Sach",
+      "The Loai",
+      "Tac Gia",
+      "Nam XB",
+      "So Luong",
+    ];
+    let html = "<table><thead><tr>";
+    headers.forEach((h) => (html += `<th>${h}</th>`));
+    html += "</tr></thead><tbody>";
+    data.forEach((d) => {
+      html += "<tr>";
+      html += `<td>${d.maSach || ""}</td>`;
+      html += `<td>${d.tenSach || ""}</td>`;
+      html += `<td>${d.theLoai || ""}</td>`;
+      html += `<td>${d.tacGia || ""}</td>`;
+      html += `<td>${d.namXuatBan || ""}</td>`;
+      html += `<td>${d.soLuong || ""}</td>`;
+      html += "</tr>";
+    });
+    html += "</tbody></table>";
+    downloadBlob(
+      html,
+      `sachs_export_${Date.now()}.xls`,
+      "application/vnd.ms-excel"
+    );
+  };
+
+  const exportPDF = (data) => {
+    // Simple PDF via print: open new window with printable table
+    if (!data || data.length === 0) return;
+    const headers = [
+      "Ma Sach",
+      "Ten Sach",
+      "The Loai",
+      "Tac Gia",
+      "Nam XB",
+      "So Luong",
+    ];
+    let html = `<!doctype html><html><head><meta charset="utf-8"><title>Export PDF</title><style>table{width:100%;border-collapse:collapse}th,td{border:1px solid #333;padding:6px;font-size:12px}</style></head><body>`;
+    html += "<h3>Danh sach sach</h3>";
+    html += "<table><thead><tr>";
+    headers.forEach((h) => (html += `<th>${h}</th>`));
+    html += "</tr></thead><tbody>";
+    data.forEach((d) => {
+      html += "<tr>";
+      html += `<td>${d.maSach || ""}</td>`;
+      html += `<td>${d.tenSach || ""}</td>`;
+      html += `<td>${d.theLoai || ""}</td>`;
+      html += `<td>${d.tacGia || ""}</td>`;
+      html += `<td>${d.namXuatBan || ""}</td>`;
+      html += `<td>${d.soLuong || ""}</td>`;
+      html += "</tr>";
+    });
+    html += "</tbody></table></body></html>";
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+    // give it a moment to render then call print
+    setTimeout(() => w.print(), 500);
+  };
+
   return (
     <Container className="mt-4">
       {/* Thong bao loi hoac thanh cong */}
@@ -230,6 +367,85 @@ const SachTable = () => {
         </Col>
 
         <Col md={4} className="text-end">
+          {/* Back to home */}
+          <Button
+            variant="light"
+            className="me-2"
+            onClick={() => (window.location.href = "/")}
+          >
+            Quay ve trang chu
+          </Button>
+
+          {/* Import/Export controls */}
+          <input
+            id="import-file"
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: "none" }}
+            onChange={async (e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+              const text = await file.text();
+              const rows = parseCSV(text);
+              // expect header: maSach,tenSach,theLoai,tacGia,namXuatBan,soLuong
+              for (const row of rows) {
+                const item = {
+                  maSach: row.maSach || row.MaSach || row["maSach"] || "",
+                  tenSach: row.tenSach || row.TenSach || row["tenSach"] || "",
+                  theLoai: row.theLoai || row.TheLoai || row["theLoai"] || "",
+                  tacGia: row.tacGia || row.TacGia || row["tacGia"] || "",
+                  namXuatBan:
+                    row.namXuatBan || row.NamXB || row["namXuatBan"] || "",
+                  soLuong: row.soLuong || row.SoLuong || row["soLuong"] || 0,
+                };
+                try {
+                  const exists = sachs.find((s) => s.maSach === item.maSach);
+                  if (exists) {
+                    await sachAPI.updateSach(item.maSach, item);
+                  } else {
+                    await sachAPI.createSach(item);
+                  }
+                } catch (err) {
+                  console.error("Import error for", item, err);
+                }
+              }
+              fetchSachs();
+              e.target.value = null;
+            }}
+          />
+          <Button
+            variant="outline-secondary"
+            className="me-2"
+            onClick={() => document.getElementById("import-file").click()}
+            disabled={!canWrite}
+          >
+            Import CSV
+          </Button>
+          <Button
+            variant="outline-primary"
+            className="me-2"
+            onClick={() => exportCSV(sachs)}
+            disabled={sachs.length === 0}
+          >
+            Export CSV
+          </Button>
+          <Button
+            variant="outline-success"
+            className="me-2"
+            onClick={() => exportExcel(sachs)}
+            disabled={sachs.length === 0}
+          >
+            Export Excel
+          </Button>
+          <Button
+            variant="outline-dark"
+            className="me-2"
+            onClick={() => exportPDF(sachs)}
+            disabled={sachs.length === 0}
+          >
+            Export PDF
+          </Button>
+
           {canWrite ? (
             <>
               <Button
