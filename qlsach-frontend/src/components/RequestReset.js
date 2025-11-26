@@ -4,6 +4,7 @@ import { Form, Button, Card, Container, Alert } from "react-bootstrap";
 import { authAPI } from "../services/api";
 
 const RequestReset = () => {
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
@@ -13,12 +14,9 @@ const RequestReset = () => {
     setMessage(null);
     setError(null);
     try {
-      const res = await authAPI.requestReset(email);
+      const res = await authAPI.requestReset(username, email);
       if (res.data && res.data.success) {
-        setMessage(
-          res.data.message +
-            (res.data.resetToken ? `\nToken: ${res.data.resetToken}` : "")
-        );
+        setMessage(res.data.message);
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Loi server");
@@ -34,6 +32,16 @@ const RequestReset = () => {
           {error && <Alert variant="danger">{error}</Alert>}
 
           <Form onSubmit={handleSubmit}>
+            <Form.Group className="mb-3">
+              <Form.Label>Username</Form.Label>
+              <Form.Control
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </Form.Group>
+
             <Form.Group className="mb-3">
               <Form.Label>Email</Form.Label>
               <Form.Control

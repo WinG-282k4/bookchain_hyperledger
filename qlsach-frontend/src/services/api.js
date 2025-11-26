@@ -114,8 +114,9 @@ export const authAPI = {
     authClient.post("/auth/login", { username, password }),
   // Goi endpoint /auth/register (Khong can Token)
   register: (data) => authClient.post("/auth/register", data),
-  // Request password reset (provide email)
-  requestReset: (email) => authClient.post("/auth/request-reset", { email }),
+  // Request password reset (provide username and email)
+  requestReset: (username, email) =>
+    authClient.post("/auth/request-reset", { username, email }),
   // Reset password with token
   resetPassword: (token, newPassword) =>
     authClient.post("/auth/reset", { token, newPassword }),
