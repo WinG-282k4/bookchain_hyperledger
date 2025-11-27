@@ -49,7 +49,36 @@ export default function Reports() {
   };
 
   const handleDownload = (id) => {
-    window.location.href = `/api/reports/${id}/download`;
+    // Use authenticated API client to download blob so Authorization header is included
+    (async () => {
+      try {
+        const res = await api.get(`/reports/${id}/download`, {
+          responseType: "blob",
+        });
+        const disposition = res.headers["content-disposition"] || "";
+        let filename = "";
+        const match =
+          /filename\*=UTF-8''(.+)$/.exec(disposition) ||
+          /filename="?([^";]+)"?/.exec(disposition);
+        if (match) filename = decodeURIComponent(match[1]);
+        if (!filename) {
+          // fallback: try to find file name from reports list
+          const r = reports.find((x) => x.id === id);
+          filename = r?.file || `report_${id}`;
+        }
+        const url = window.URL.createObjectURL(new Blob([res.data]));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error("Download error", err);
+        alert("Khong tai duoc file. Kiem tra quyen truy cap va dang nhap.");
+      }
+    })();
   };
 
   if (loading)
