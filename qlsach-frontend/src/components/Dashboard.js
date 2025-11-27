@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Container, Row, Col, Card, Spinner, Tabs, Tab } from "react-bootstrap";
 import api from "../services/api";
+import { useAuth } from "../context/AuthContext";
 import {
   LineChart,
   Line,
@@ -30,15 +31,22 @@ export default function Dashboard() {
   const [txByHour, setTxByHour] = useState(null);
   const [txHourLoading, setTxHourLoading] = useState(false);
   const [topBooksToday, setTopBooksToday] = useState([]);
+  const [txGranularity, setTxGranularity] = useState("hour"); // minute | hour | day
   const [myBooks, setMyBooks] = useState(null);
   const [myBooksLoading, setMyBooksLoading] = useState(false);
+  const { user } = useAuth();
+  const canSeeMyBooks = user && user.role === "User";
 
   useEffect(() => {
     fetchMetrics();
     fetchTopTransactions();
-    fetchTransactionsByHour();
     fetchMyBooks();
   }, []);
+
+  // Re-fetch transactions chart when granularity changes
+  useEffect(() => {
+    fetchTransactionsByGranularity(txGranularity);
+  }, [txGranularity]);
 
   const fetchMyBooks = async () => {
     setMyBooksLoading(true);
@@ -78,8 +86,11 @@ export default function Dashboard() {
     }
   };
 
-  // Aggregate transactions per hour across all books by fetching each book history.
-  const fetchTransactionsByHour = async () => {
+  // Aggregate transactions across all books by fetching each book history.
+  // granularity: 'minute' => last 60 minutes per-minute buckets
+  // 'hour' => last 24 hours per-hour buckets
+  // 'day' => last 7 days per-day buckets
+  const fetchTransactionsByGranularity = async (granularity = "hour") => {
     setTxHourLoading(true);
     try {
       // get all books
@@ -104,9 +115,25 @@ export default function Dashboard() {
 
       const allHistories = await Promise.all(historyPromises);
 
-      // Flatten and aggregate by hour (local time) and compute per-book counts for today
-      const counts = new Array(24).fill(0);
-      const perBookToday = {};
+      // Choose buckets based on granularity
+      let buckets = 24;
+      let bucketMs = 60 * 60 * 1000; // default 1 hour
+      if (granularity === "minute") {
+        buckets = 60;
+        bucketMs = 60 * 1000;
+      } else if (granularity === "hour") {
+        buckets = 24;
+        bucketMs = 60 * 60 * 1000;
+      } else if (granularity === "day") {
+        buckets = 7;
+        bucketMs = 24 * 60 * 60 * 1000;
+      }
+
+      const nowMs = Date.now();
+      const windowStart = nowMs - buckets * bucketMs;
+
+      const counts = new Array(buckets).fill(0);
+      const perBookWindow = {};
       for (const arr of allHistories) {
         // arr is now { ma, history }
         if (!arr || !Array.isArray(arr.history)) continue;
@@ -143,31 +170,38 @@ export default function Dashboard() {
             }
           }
           if (date && !isNaN(date.getTime())) {
-            const hr = date.getHours();
-            counts[hr] = (counts[hr] || 0) + 1;
-            // if the date is today (local), count for per-book today
-            const now = new Date();
-            if (
-              date.getFullYear() === now.getFullYear() &&
-              date.getMonth() === now.getMonth() &&
-              date.getDate() === now.getDate()
-            ) {
-              perBookToday[ma] = (perBookToday[ma] || 0) + 1;
+            const ms = date.getTime();
+            if (ms >= windowStart && ms <= nowMs) {
+              const idx = Math.floor((ms - windowStart) / bucketMs);
+              if (idx >= 0 && idx < buckets)
+                counts[idx] = (counts[idx] || 0) + 1;
+              perBookWindow[ma] = (perBookWindow[ma] || 0) + 1;
             }
           }
         }
       }
-
-      const data = counts.map((c, h) => ({
-        hour: `${String(h).padStart(2, "0")}:00`,
-        count: c,
-      }));
+      // build labels from windowStart
+      const data = counts.map((c, i) => {
+        const startMs = windowStart + i * bucketMs;
+        const d = new Date(startMs);
+        let label = "";
+        if (granularity === "minute") {
+          label = `${String(d.getHours()).padStart(2, "0")}:${String(
+            d.getMinutes()
+          ).padStart(2, "0")}`;
+        } else if (granularity === "hour") {
+          label = `${String(d.getHours()).padStart(2, "0")}:00`;
+        } else {
+          label = d.toLocaleDateString();
+        }
+        return { label, count: c };
+      });
       setTxByHour(data);
 
-      // compute top books today from perBookToday
-      const topBooks = Object.keys(perBookToday).map((ma) => ({
+      // compute top books in the window
+      const topBooks = Object.keys(perBookWindow).map((ma) => ({
         maSach: ma,
-        count: perBookToday[ma],
+        count: perBookWindow[ma],
       }));
       topBooks.sort((a, b) => b.count - a.count);
       setTopBooksToday(topBooks.slice(0, 20));
@@ -225,7 +259,31 @@ export default function Dashboard() {
             <Col md={12}>
               <Card>
                 <Card.Body>
-                  <h5>Transactions per Hour (today)</h5>
+                  <div className="d-flex justify-content-between align-items-center">
+                    <h5 className="mb-0">
+                      Transactions (
+                      {txGranularity === "minute"
+                        ? "per minute"
+                        : txGranularity === "hour"
+                        ? "per hour"
+                        : "per day"}
+                      )
+                    </h5>
+                    <div>
+                      <select
+                        className="form-select form-select-sm"
+                        value={txGranularity}
+                        onChange={(e) => setTxGranularity(e.target.value)}
+                        style={{ width: 220 }}
+                      >
+                        <option value="minute">
+                          Per Minute (last 60 minutes)
+                        </option>
+                        <option value="hour">Per Hour (last 24 hours)</option>
+                        <option value="day">Per Day (last 7 days)</option>
+                      </select>
+                    </div>
+                  </div>
                   {txHourLoading || !txByHour ? (
                     <div className="text-center py-3">
                       <Spinner animation="border" size="sm" />
@@ -234,7 +292,7 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height={250}>
                       <LineChart data={txByHour}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="hour" />
+                        <XAxis dataKey="label" />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
                         <Line
@@ -340,48 +398,53 @@ export default function Dashboard() {
           </Row>
         </Tab>
 
-        <Tab eventKey="mybooks" title="My Purchased Books">
-          <Row className="mt-3">
-            <Col md={12}>
-              <Card>
-                <Card.Body>
-                  {myBooksLoading ? (
-                    <div className="text-center py-3">
-                      <Spinner animation="border" size="sm" />
-                    </div>
-                  ) : !myBooks || myBooks.length === 0 ? (
-                    <div className="text-center py-3">
-                      You have not purchased any books yet.
-                    </div>
-                  ) : (
-                    <div className="table-responsive">
-                      <table className="table table-sm mb-0">
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>Ma Sach</th>
-                            <th>So luong so huu</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {myBooks.map((b, idx) => (
-                            <tr key={b.maSach + idx}>
-                              <td>{idx + 1}</td>
-                              <td>{b.maSach}</td>
-                              <td>
-                                {b.soLuongSoHuu || b.soLuong || b.quantity || 0}
-                              </td>
+        {canSeeMyBooks && (
+          <Tab eventKey="mybooks" title="My Purchased Books">
+            <Row className="mt-3">
+              <Col md={12}>
+                <Card>
+                  <Card.Body>
+                    {myBooksLoading ? (
+                      <div className="text-center py-3">
+                        <Spinner animation="border" size="sm" />
+                      </div>
+                    ) : !myBooks || myBooks.length === 0 ? (
+                      <div className="text-center py-3">
+                        You have not purchased any books yet.
+                      </div>
+                    ) : (
+                      <div className="table-responsive">
+                        <table className="table table-sm mb-0">
+                          <thead>
+                            <tr>
+                              <th>#</th>
+                              <th>Ma Sach</th>
+                              <th>So luong so huu</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </Tab>
+                          </thead>
+                          <tbody>
+                            {myBooks.map((b, idx) => (
+                              <tr key={b.maSach + idx}>
+                                <td>{idx + 1}</td>
+                                <td>{b.maSach}</td>
+                                <td>
+                                  {b.soLuongSoHuu ||
+                                    b.soLuong ||
+                                    b.quantity ||
+                                    0}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+          </Tab>
+        )}
       </Tabs>
     </Container>
   );
