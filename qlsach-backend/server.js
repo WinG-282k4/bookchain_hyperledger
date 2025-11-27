@@ -1,4 +1,4 @@
-// qlsach-backend/server.js (Cap nhat de ho tro Guest/Truy van khong can Token)
+// qlsach-backend/server.js
 
 require("dotenv").config();
 const express = require("express");
