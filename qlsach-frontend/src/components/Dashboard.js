@@ -8,6 +8,9 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  BarChart,
+  Bar,
+  CartesianGrid,
 } from "recharts";
 
 const KPI = ({ title, value }) => (
@@ -80,13 +83,42 @@ export default function Dashboard() {
             <Card.Body>
               <h5>Category Breakdown</h5>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
                   <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="#8884d8" />
-                </LineChart>
+                  <Bar dataKey="value" fill="#8884d8" />
+                </BarChart>
               </ResponsiveContainer>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+      <Row className="mt-3">
+        <Col md={6}>
+          <Card>
+            <Card.Body>
+              <h5>Top 10 Authors</h5>
+              <table className="table table-sm">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Author</th>
+                    <th>Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(metrics.topAuthors || []).slice(0, 10).map((a, idx) => (
+                    <tr key={a.author + idx}>
+                      <td>{idx + 1}</td>
+                      <td>{a.author}</td>
+                      <td>{a.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </Card.Body>
           </Card>
         </Col>

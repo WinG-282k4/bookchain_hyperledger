@@ -17,7 +17,12 @@ if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir);
 async function fetchAllBooks(conn) {
   if (!conn || !conn.contract) throw new Error("Fabric connection required");
   const result = await conn.contract.evaluateTransaction("queryAllSach");
-  return JSON.parse(result.toString());
+  const raw = JSON.parse(result.toString());
+  // normalize objects: many Fabric query results use { Key, Record } or { Record }
+  if (Array.isArray(raw)) {
+    return raw.map((r) => (r && r.Record ? r.Record : r));
+  }
+  return raw;
 }
 
 // Compute basic metrics from book list
@@ -54,13 +59,8 @@ function computeMetrics(books = [], period = "daily") {
 }
 
 // Save buffer or string to reports folder and write metadata
-function saveReportFile(bufferOrString, filename, meta = {}) {
-  const filePath = path.join(reportsDir, filename);
-  if (Buffer.isBuffer(bufferOrString))
-    fs.writeFileSync(filePath, bufferOrString);
-  else fs.writeFileSync(filePath, String(bufferOrString), "utf8");
-
-  // metadata index
+// Save report metadata (do NOT overwrite the generated file)
+function saveReportMeta(filename, meta = {}) {
   const indexFile = path.join(reportsDir, "index.json");
   let index = [];
   if (fs.existsSync(indexFile)) {
@@ -140,9 +140,21 @@ module.exports = {
   ) {
     const books = await fetchAllBooks(conn);
     // for now type/dates ignored: full dump
-    const { filename } = buildWorkbookAndSave(books, `books_${type}_${period}`);
+    const { filename, path: filePath } = buildWorkbookAndSave(
+      books,
+      `books_${type}_${period}`
+    );
+    // ensure file exists
+    if (!fs.existsSync(path.join(reportsDir, filename))) {
+      // if workbook function returned a path, use that
+      if (filePath && fs.existsSync(filePath)) {
+        // ok
+      } else {
+        throw new Error("Report file was not created");
+      }
+    }
     const meta = { type, period, format, from, to };
-    const entry = saveReportFile(null, filename, meta);
+    const entry = saveReportMeta(filename, meta);
     return entry;
   },
 

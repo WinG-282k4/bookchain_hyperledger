@@ -145,3 +145,16 @@ npm install recharts
 ### 6) Bảo mật & Quyền
 
 - Các endpoint tạo/liệt kê/tải báo cáo được bảo vệ bằng middleware `protect` và `authorize('Admin','Manager')`. Đảm bảo JWT và role được cấu hình đúng.
+
+### 7) Nội dung file báo cáo (CSV / XLSX)
+
+Mặc định prototype hiện tại xuất toàn bộ danh sách sách (full dump). Các cột được xuất là:
+
+- `maSach` : Mã sách (ví dụ `S001`)
+- `tenSach` : Tên sách
+- `theLoai` : Thể loại
+- `tacGia` : Tác giả
+- `namXuatBan` : Năm xuất bản
+- `soLuong` : Số lượng tồn kho (số nguyên)
+
+Lưu ý: nếu bạn muốn thêm các cột khác (ví dụ: ngày thêm, người nhập, lịch sử giao dịch), tôi có thể mở rộng `reportService.generateReport` để thu thập thông tin bổ sung từ ledger hoặc nguồn khác.
