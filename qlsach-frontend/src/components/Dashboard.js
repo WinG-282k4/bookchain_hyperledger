@@ -25,9 +25,12 @@ const KPI = ({ title, value }) => (
 export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState(null);
+  const [topTx, setTopTx] = useState(null);
+  const [txLoading, setTxLoading] = useState(false);
 
   useEffect(() => {
     fetchMetrics();
+    fetchTopTransactions();
   }, []);
 
   const fetchMetrics = async () => {
@@ -39,6 +42,18 @@ export default function Dashboard() {
       console.error("fetchMetrics", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTopTransactions = async () => {
+    setTxLoading(true);
+    try {
+      const res = await api.get("/reports/transactions?limit=10");
+      if (res.data && res.data.success) setTopTx(res.data.data.top);
+    } catch (err) {
+      console.error("fetchTopTransactions", err);
+    } finally {
+      setTxLoading(false);
     }
   };
 
@@ -119,6 +134,37 @@ export default function Dashboard() {
                   ))}
                 </tbody>
               </table>
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={6}>
+          <Card>
+            <Card.Body>
+              <h5>Top Books by Transactions</h5>
+              {txLoading ? (
+                <div className="text-center py-3">
+                  <Spinner animation="border" size="sm" />
+                </div>
+              ) : (
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Ma Sach</th>
+                      <th>Tx Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(topTx || []).map((t, idx) => (
+                      <tr key={t.maSach}>
+                        <td>{idx + 1}</td>
+                        <td>{t.maSach}</td>
+                        <td>{t.transactions}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </Card.Body>
           </Card>
         </Col>

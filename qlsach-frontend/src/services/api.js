@@ -150,12 +150,19 @@ export const sachAPI = {
   getSachByTheLoai: (theLoai) => api.get(`/sach/theloai/${theLoai}`),
   updateSoLuongSach: (maSach, soLuongMoi) =>
     api.patch(`/sach/${maSach}/soluong`, { soLuongMoi }),
-  buySach: (maSach, quantity) => api.post("/purchase", { maSach, quantity }),
+  // Buy using the user-specific chaincode method (submits transaction with user's identity)
+  buySach: (maSach, quantity) =>
+    api.post("/sach/buy", { maSach, soLuong: quantity }),
+  getMyBooks: () => api.get("/my-books"),
+  getHistory: (maSach) => api.get(`/sach/${maSach}/history`),
 };
 
 // Sales APIs
 export const salesAPI = {
   getTopSellers: (period) => api.get(`/reports/sales?period=${period}`),
+  // Top by transaction counts
+  getTopTransactions: (limit = 10) =>
+    api.get(`/reports/transactions?limit=${limit}`),
 };
 
 export default api;

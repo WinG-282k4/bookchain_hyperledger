@@ -149,6 +149,69 @@ app.get("/api/sach/theloai/:theLoai", async (req, res) => {
   }
 });
 
+// Xem lich su 1 cuon sach (public - su dung guest id de minh bach)
+app.get("/api/sach/:maSach/history", async (req, res) => {
+  let conn;
+  try {
+    const fabricId = GUEST_FABRIC_ID; // public history
+    conn = await connectToNetwork(fabricId);
+    const result = await conn.contract.evaluateTransaction(
+      "getHistorySach",
+      req.params.maSach
+    );
+    const history = JSON.parse(result.toString());
+    const transactionCount = Array.isArray(history) ? history.length : 0;
+    res.json({
+      success: true,
+      totalTransactions: transactionCount,
+      data: history,
+    });
+  } catch (error) {
+    console.error("getHistory error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  } finally {
+    if (conn && conn.gateway) conn.gateway.disconnect();
+  }
+});
+
+// GET /api/reports/transactions?limit=10  - compute top books by number of transactions
+app.get("/api/reports/transactions", async (req, res) => {
+  let conn;
+  try {
+    const limit = Number(req.query.limit) || 10;
+    conn = await connectToNetwork(GUEST_FABRIC_ID);
+
+    // get all books
+    const allRes = await conn.contract.evaluateTransaction("queryAllSach");
+    const all = JSON.parse(allRes.toString()) || [];
+
+    const results = [];
+    for (const item of all) {
+      const ma = item.Record ? item.Record.maSach : item.maSach || item.Key;
+      try {
+        const his = await conn.contract.evaluateTransaction(
+          "getHistorySach",
+          ma
+        );
+        const arr = JSON.parse(his.toString()) || [];
+        results.push({ maSach: ma, transactions: arr.length });
+      } catch (e) {
+        console.warn(`history lookup failed for ${ma}:`, e.message || e);
+        results.push({ maSach: ma, transactions: 0 });
+      }
+    }
+
+    results.sort((a, b) => b.transactions - a.transactions);
+    const top = results.slice(0, limit);
+    res.json({ success: true, data: { top, total: results.length } });
+  } catch (error) {
+    console.error("reports transactions error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  } finally {
+    if (conn && conn.gateway) conn.gateway.disconnect();
+  }
+});
+
 // -------------------------------------------------------------
 // === API THAO TAC GHI (ADMIN/MANAGER - CAN TOKEN) ===
 // -------------------------------------------------------------
@@ -156,6 +219,8 @@ app.get("/api/sach/theloai/:theLoai", async (req, res) => {
 // Ap dung protect va authorize cho tung route ghi
 // Ly do: cac middleware nay se set req.user.fabricId khi Token hop le
 const adminManagerAuth = [protect, authorize("Admin", "Manager")];
+
+const reportService = require("./services/reportService");
 
 // 4. Tao sach moi
 app.post("/api/sach", adminManagerAuth, async (req, res) => {
@@ -287,6 +352,75 @@ app.post("/api/init", adminManagerAuth, async (req, res) => {
       .json({ success: true, message: "Da khoi tao du lieu sach thanh cong" });
   } catch (error) {
     console.error(`Failed to initialize ledger: ${error}`);
+    res.status(500).json({ success: false, error: error.message });
+  } finally {
+    if (conn && conn.gateway) conn.gateway.disconnect();
+  }
+});
+
+// --- API Mua sach (User only) ---
+app.post("/api/sach/buy", protect, async (req, res) => {
+  let conn;
+  try {
+    const { maSach, soLuong } = req.body;
+    if (!maSach || !soLuong) {
+      return res
+        .status(400)
+        .json({ success: false, error: "maSach and soLuong required" });
+    }
+    // block Admin/Manager from buying
+    if (
+      req.user &&
+      (req.user.role === "Admin" || req.user.role === "Manager")
+    ) {
+      return res
+        .status(403)
+        .json({ success: false, error: "Only regular users can buy books" });
+    }
+
+    conn = await connectToNetwork(req.user.fabricId || GUEST_FABRIC_ID);
+    // submit buy transaction
+    await conn.contract.submitTransaction("buySach", maSach, String(soLuong));
+    // fetch updated book to return newQty
+    const updated = await conn.contract.evaluateTransaction(
+      "querySach",
+      maSach
+    );
+    const sach = JSON.parse(updated.toString());
+
+    // record purchase in local purchases.json for reporting
+    try {
+      reportService.recordPurchase({
+        maSach,
+        quantity: Number(soLuong),
+        buyer: req.user.username || req.user.id || req.user.fabricId,
+      });
+    } catch (e) {
+      console.warn("Failed to record purchase metadata:", e.message || e);
+    }
+
+    res.json({
+      success: true,
+      message: "Mua sách thành công!",
+      data: { maSach, newQty: sach.soLuong },
+    });
+  } catch (error) {
+    console.error("Buy book error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  } finally {
+    if (conn && conn.gateway) conn.gateway.disconnect();
+  }
+});
+
+// --- API Xem tu sach cua toi ---
+app.get("/api/my-books", protect, async (req, res) => {
+  let conn;
+  try {
+    conn = await connectToNetwork(req.user.fabricId || GUEST_FABRIC_ID);
+    const result = await conn.contract.evaluateTransaction("getMyBooks");
+    res.json({ success: true, data: JSON.parse(result.toString()) });
+  } catch (error) {
+    console.error("getMyBooks error:", error);
     res.status(500).json({ success: false, error: error.message });
   } finally {
     if (conn && conn.gateway) conn.gateway.disconnect();

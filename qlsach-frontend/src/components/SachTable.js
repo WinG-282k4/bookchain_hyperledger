@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from "react";
-import {
-  Table,
-  Button,
-  Modal,
-  Form,
-  Alert,
-  Spinner,
-  Badge,
-  Container,
-  Row,
-  Col,
-  InputGroup,
-  FormControl,
-} from "react-bootstrap";
-import { sachAPI } from "../services/api";
-import { useAuth } from "../context/AuthContext";
-
+try {
+  const res = await sachAPI.getHistory(sach.maSach);
+  if (res.data && res.data.success) {
+    const raw = res.data.data || [];
+    const normalized = Array.isArray(raw)
+      ? raw.map((r) => normalizeHistoryEntry(r))
+      : [normalizeHistoryEntry(raw)];
+    setHistoryEntries(normalized);
+  } else {
+    setHistoryEntries([]);
+  }
+} catch (err) {
+  console.error("history error", err);
+  setHistoryEntries([]);
+} finally {
+  setHistoryLoading(false);
+}
 const SachTable = () => {
   const { user, isAuthorized } = useAuth();
   const canWrite = isAuthorized(["Admin", "Manager"]);
@@ -39,6 +39,10 @@ const SachTable = () => {
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [buyQty, setBuyQty] = useState(1);
   const [buyItem, setBuyItem] = useState(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyFor, setHistoryFor] = useState(null);
+  const [historyEntries, setHistoryEntries] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Load du lieu khi component duoc mount
   useEffect(() => {
@@ -61,6 +65,56 @@ const SachTable = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Normalize history entries from backend/chaincode to a consistent shape
+  const normalizeHistoryEntry = (raw) => {
+    const entry = raw || {};
+    // tx id may come as txId or tx_id
+    const txId = entry.txId || entry.tx_id || entry.TxId || "";
+
+    // timestamp may be ISO, locale string, number, or object { seconds, nanos }
+    let timestamp = entry.timestamp || entry.time || "";
+    try {
+      if (timestamp && typeof timestamp === "object") {
+        // try to handle protobuf-like { seconds, nanos }
+        const secs =
+          typeof timestamp.seconds === "function"
+            ? timestamp.seconds()
+            : timestamp.seconds || timestamp.seconds?.toNumber?.() || 0;
+        const nanos = timestamp.nanos || 0;
+        timestamp = new Date(
+          Number(secs) * 1000 + Number(nanos) / 1000000
+        ).toISOString();
+      } else if (typeof timestamp === "number") {
+        timestamp = new Date(timestamp).toISOString();
+      } else if (typeof timestamp === "string") {
+        // leave as-is (could be ISO or locale); try to parse to ISO if possible
+        const d = new Date(timestamp);
+        if (!isNaN(d.getTime())) timestamp = d.toISOString();
+      }
+    } catch (e) {
+      timestamp = String(entry.timestamp || "");
+    }
+
+    // isDelete normalization
+    let isDelete = false;
+    if (entry.isDelete !== undefined)
+      isDelete = entry.isDelete === true || String(entry.isDelete) === "true";
+    else if (entry.is_delete !== undefined)
+      isDelete = entry.is_delete === true || String(entry.is_delete) === "true";
+
+    // data normalization: try parse if string
+    let data = entry.data ?? entry.value ?? entry.Value ?? null;
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch (e) {
+        // keep string
+      }
+    }
+
+    return { txId, timestamp, isDelete, data };
   };
 
   const handleFilter = async () => {
@@ -510,8 +564,8 @@ const SachTable = () => {
                     <td>{sach.namXuatBan}</td>
                     <td>{sach.soLuong}</td>
                     <td className="text-center">
-                      {/* Buy button for regular users only (Admins/Managers cannot buy) */}
-                      {user && !canWrite && (
+                      {/* Buy button visible only to regular users (role === 'User') */}
+                      {user && user.role === "User" && (
                         <Button
                           variant="outline-success"
                           size="sm"
@@ -525,6 +579,32 @@ const SachTable = () => {
                           Mua
                         </Button>
                       )}
+                      {/* View history (public) */}
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        className="me-2"
+                        onClick={async () => {
+                          setHistoryLoading(true);
+                          setShowHistoryModal(true);
+                          setHistoryFor(sach.maSach);
+                          try {
+                            const res = await sachAPI.getHistory(sach.maSach);
+                            if (res.data && res.data.success) {
+                              setHistoryEntries(res.data.data || []);
+                            } else {
+                              setHistoryEntries([]);
+                            }
+                          } catch (err) {
+                            console.error("history error", err);
+                            setHistoryEntries([]);
+                          } finally {
+                            setHistoryLoading(false);
+                          }
+                        }}
+                      >
+                        Lịch sử
+                      </Button>
                       {canWrite && (
                         <>
                           <Button
@@ -715,6 +795,70 @@ const SachTable = () => {
             </Button>
           </Modal.Footer>
         </Form>
+      </Modal>
+
+      {/* Modal Lich su sach */}
+      <Modal
+        show={showHistoryModal}
+        onHide={() => setShowHistoryModal(false)}
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Lịch sử sách {historyFor || ""}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {historyLoading ? (
+            <div className="text-center py-3">Đang tải...</div>
+          ) : (
+            <div>
+              <p>Số giao dịch: {historyEntries.length}</p>
+              <div style={{ maxHeight: 400, overflow: "auto" }}>
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>TxId</th>
+                      <th>Time</th>
+                      <th>isDelete</th>
+                      <th>Data (summary)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyEntries.map((h, idx) => (
+                      <tr key={h.txId + idx}>
+                        <td style={{ wordBreak: "break-all" }}>{h.txId}</td>
+                        <td>
+                          {h.timestamp
+                            ? new Date(h.timestamp).toLocaleString()
+                            : ""}
+                        </td>
+                        <td>{String(h.isDelete)}</td>
+                        <td>
+                          {h.data && typeof h.data === "object" ? (
+                            <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+                              {JSON.stringify(h.data, null, 2)}
+                            </pre>
+                          ) : (
+                            <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+                              {String(h.data)}
+                            </pre>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setShowHistoryModal(false)}
+          >
+            Đóng
+          </Button>
+        </Modal.Footer>
       </Modal>
     </Container>
   );

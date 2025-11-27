@@ -2,168 +2,296 @@
  * Chaincode Quan Ly Sach
  * Dua tren FabCar
  */
-'use strict';
+"use strict";
 
-const { Contract } = require('fabric-contract-api');
+const { Contract } = require("fabric-contract-api");
 
 class QLSach extends Contract {
+  async initLedger(ctx) {
+    console.info("============= START : Khoi Tao Du Lieu Sach ===========");
+    const sachs = [
+      {
+        maSach: "S001",
+        tenSach: "Lap Trinh Blockchain",
+        theLoai: "CNTT",
+        tacGia: "Nguyen Van A",
+        namXuatBan: "2023",
+        soLuong: 100,
+      },
+      {
+        maSach: "S002",
+        tenSach: "Tri Tue Nhan Tao",
+        theLoai: "CNTT",
+        tacGia: "Tran Thi B",
+        namXuatBan: "2022",
+        soLuong: 150,
+      },
+      {
+        maSach: "S003",
+        tenSach: "Kinh Te Vi Mo",
+        theLoai: "Kinh Te",
+        tacGia: "Le Van C",
+        namXuatBan: "2021",
+        soLuong: 200,
+      },
+      {
+        maSach: "S004",
+        tenSach: "Tieu Thuyet X",
+        theLoai: "Van Hoc",
+        tacGia: "Pham Thi D",
+        namXuatBan: "2020",
+        soLuong: 50,
+      },
+      {
+        maSach: "S005",
+        tenSach: "Khoa Hoc Du Lieu",
+        theLoai: "CNTT",
+        tacGia: "Hoang Van E",
+        namXuatBan: "2024",
+        soLuong: 120,
+      },
+    ];
 
-    async initLedger(ctx) {
-        console.info('============= START : Khoi Tao Du Lieu Sach ===========');
-        const sachs = [
-            {
-                maSach: 'S001',
-                tenSach: 'Lap Trinh Blockchain',
-                theLoai: 'CNTT',
-                tacGia: 'Nguyen Van A',
-                namXuatBan: '2023',
-                soLuong: 100
-            },
-            {
-                maSach: 'S002',
-                tenSach: 'Tri Tue Nhan Tao',
-                theLoai: 'CNTT',
-                tacGia: 'Tran Thi B',
-                namXuatBan: '2022',
-                soLuong: 150
-            },
-            {
-                maSach: 'S003',
-                tenSach: 'Kinh Te Vi Mo',
-                theLoai: 'Kinh Te',
-                tacGia: 'Le Van C',
-                namXuatBan: '2021',
-                soLuong: 200
-            },
-            {
-                maSach: 'S004',
-                tenSach: 'Tieu Thuyet X',
-                theLoai: 'Van Hoc',
-                tacGia: 'Pham Thi D',
-                namXuatBan: '2020',
-                soLuong: 50
-            },
-            {
-                maSach: 'S005',
-                tenSach: 'Khoa Hoc Du Lieu',
-                theLoai: 'CNTT',
-                tacGia: 'Hoang Van E',
-                namXuatBan: '2024',
-                soLuong: 120
-            }
-        ];
+    for (let i = 0; i < sachs.length; i++) {
+      sachs[i].docType = "sach";
+      await ctx.stub.putState(
+        sachs[i].maSach,
+        Buffer.from(JSON.stringify(sachs[i]))
+      );
+      console.info("Da them sach: ", sachs[i].maSach, " - ", sachs[i].tenSach);
+    }
+    console.info("============= END : Khoi Tao Du Lieu Sach ===========");
+  }
 
-        for (let i = 0; i < sachs.length; i++) {
-            sachs[i].docType = 'sach';
-            await ctx.stub.putState(sachs[i].maSach, Buffer.from(JSON.stringify(sachs[i])));
-            console.info('Da them sach: ', sachs[i].maSach, ' - ', sachs[i].tenSach);
+  async querySach(ctx, maSach) {
+    const sachAsBytes = await ctx.stub.getState(maSach);
+    if (!sachAsBytes || sachAsBytes.length === 0) {
+      throw new Error(`Sach ${maSach} khong ton tai`);
+    }
+    console.log(sachAsBytes.toString());
+    return sachAsBytes.toString();
+  }
+
+  async createSach(ctx, maSach, tenSach, theLoai, tacGia, namXuatBan, soLuong) {
+    console.info("============= START : Tao Sach Moi ===========");
+    const exists = await ctx.stub.getState(maSach);
+    if (exists && exists.length > 0) {
+      throw new Error(`Sach ${maSach} da ton tai`);
+    }
+
+    const sach = {
+      docType: "sach",
+      maSach: maSach,
+      tenSach: tenSach,
+      theLoai: theLoai,
+      tacGia: tacGia,
+      namXuatBan: namXuatBan,
+      soLuong: parseInt(soLuong),
+    };
+
+    await ctx.stub.putState(maSach, Buffer.from(JSON.stringify(sach)));
+    console.info("============= END : Tao Sach Moi ===========");
+    return JSON.stringify(sach);
+  }
+
+  async queryAllSach(ctx) {
+    const startKey = "";
+    const endKey = "";
+    const allResults = [];
+    for await (const { key, value } of ctx.stub.getStateByRange(
+      startKey,
+      endKey
+    )) {
+      const strValue = Buffer.from(value).toString("utf8");
+      let record;
+      try {
+        record = JSON.parse(strValue);
+      } catch (err) {
+        console.log(err);
+        record = strValue;
+      }
+      allResults.push({ Key: key, Record: record });
+    }
+    console.info(allResults);
+    return JSON.stringify(allResults);
+  }
+
+  async updateSach(ctx, maSach, tenSach, theLoai, tacGia, namXuatBan, soLuong) {
+    console.info("============= START : Cap Nhat Sach ===========");
+    const sachAsBytes = await ctx.stub.getState(maSach);
+    if (!sachAsBytes || sachAsBytes.length === 0) {
+      throw new Error(`Sach ${maSach} khong ton tai`);
+    }
+
+    const sach = JSON.parse(sachAsBytes.toString());
+    sach.tenSach = tenSach;
+    sach.theLoai = theLoai;
+    sach.tacGia = tacGia;
+    sach.namXuatBan = namXuatBan;
+    sach.soLuong = parseInt(soLuong);
+
+    await ctx.stub.putState(maSach, Buffer.from(JSON.stringify(sach)));
+    console.info("============= END : Cap Nhat Sach ===========");
+    return JSON.stringify(sach);
+  }
+
+  async deleteSach(ctx, maSach) {
+    console.info("============= START : Xoa Sach ===========");
+    const exists = await ctx.stub.getState(maSach);
+    if (!exists || exists.length === 0) {
+      throw new Error(`Sach ${maSach} khong ton tai`);
+    }
+    await ctx.stub.deleteState(maSach);
+    console.info("============= END : Xoa Sach ===========");
+    return `Da xoa sach ${maSach}`;
+  }
+
+  async querySachByTheLoai(ctx, theLoai) {
+    console.info("============= START : Tim Sach Theo The Loai ===========");
+    const allSach = JSON.parse(await this.queryAllSach(ctx));
+    const result = allSach.filter((item) => item.Record.theLoai === theLoai);
+    console.info(`Tim thay ${result.length} sach thuoc the loai ${theLoai}`);
+    return JSON.stringify(result);
+  }
+
+  async updateSoLuongSach(ctx, maSach, soLuongMoi) {
+    console.info("============= START : Cap Nhat So Luong Sach ===========");
+    const sachAsBytes = await ctx.stub.getState(maSach);
+    if (!sachAsBytes || sachAsBytes.length === 0) {
+      throw new Error(`Sach ${maSach} khong ton tai`);
+    }
+    const sach = JSON.parse(sachAsBytes.toString());
+    const soLuongCu = sach.soLuong;
+    sach.soLuong = parseInt(soLuongMoi);
+
+    await ctx.stub.putState(maSach, Buffer.from(JSON.stringify(sach)));
+    console.info(
+      `Da cap nhat so luong sach ${maSach} tu ${soLuongCu} thanh ${soLuongMoi}`
+    );
+    console.info("============= END : Cap Nhat So Luong Sach ===========");
+    return JSON.stringify(sach);
+  }
+
+  // 1. Hàm Mua Sách: Trừ kho tổng, cộng kho User
+  async buySach(ctx, maSach, soLuongMuaStr) {
+    const soLuongMua = parseInt(soLuongMuaStr);
+    const cid = ctx.clientIdentity;
+    const userId = cid.getID();
+
+    // a. Check sách tồn tại
+    const sachAsBytes = await ctx.stub.getState(maSach);
+    if (!sachAsBytes || sachAsBytes.length === 0) {
+      throw new Error(`Sách ${maSach} không tồn tại`);
+    }
+    const sach = JSON.parse(sachAsBytes.toString());
+
+    // b. Check kho còn hàng
+    if (sach.soLuong < soLuongMua) {
+      throw new Error(
+        `Kho chỉ còn ${sach.soLuong}, không đủ để bán ${soLuongMua}`
+      );
+    }
+
+    // c. Trừ kho tổng & Update lại
+    sach.soLuong -= soLuongMua;
+    await ctx.stub.putState(maSach, Buffer.from(JSON.stringify(sach)));
+
+    // d. CỘNG SÁCH CHO USER (Dùng Composite Key)
+    const balanceKey = ctx.stub.createCompositeKey("balance", [userId, maSach]);
+
+    // Lấy số lượng hiện có của user (nếu đã từng mua)
+    let currentBalance = 0;
+    const balanceBytes = await ctx.stub.getState(balanceKey);
+    if (balanceBytes && balanceBytes.length > 0) {
+      currentBalance = parseInt(balanceBytes.toString());
+    }
+
+    // Ghi số lượng mới
+    const newBalance = currentBalance + soLuongMua;
+    await ctx.stub.putState(balanceKey, Buffer.from(newBalance.toString()));
+
+    return JSON.stringify({
+      message: `User ${userId} mua thành công ${soLuongMua} cuốn ${maSach}`,
+    });
+  }
+
+  // 2. Hàm Xem Tủ Sách Của Tôi
+  async getMyBooks(ctx) {
+    const userId = ctx.clientIdentity.getID();
+    const iterator = await ctx.stub.getStateByPartialCompositeKey("balance", [
+      userId,
+    ]);
+
+    const results = [];
+    while (true) {
+      const res = await iterator.next();
+      if (res.value && res.value.value.toString()) {
+        const keyParts = ctx.stub.splitCompositeKey(res.value.key);
+        const maSach = keyParts.attributes[1];
+        const soLuong = parseInt(res.value.value.toString("utf8"));
+
+        if (soLuong > 0) {
+          results.push({ maSach, soLuongSoHuu: soLuong });
         }
-        console.info('============= END : Khoi Tao Du Lieu Sach ===========');
+      }
+      if (res.done) {
+        await iterator.close();
+        break;
+      }
     }
+    return JSON.stringify(results);
+  }
 
-    async querySach(ctx, maSach) {
-        const sachAsBytes = await ctx.stub.getState(maSach);
-        if (!sachAsBytes || sachAsBytes.length === 0) {
-            throw new Error(`Sach ${maSach} khong ton tai`);
-        }
-        console.log(sachAsBytes.toString());
-        return sachAsBytes.toString();
-    }
+  // Hàm xem lịch sử giao dịch của một cuốn sách
+  async getHistorySach(ctx, maSach) {
+    console.info("============= START : Get History Sach ===========");
+    const iterator = await ctx.stub.getHistoryForKey(maSach);
+    const allResults = [];
 
-    async createSach(ctx, maSach, tenSach, theLoai, tacGia, namXuatBan, soLuong) {
-        console.info('============= START : Tao Sach Moi ===========');
-        const exists = await ctx.stub.getState(maSach);
-        if (exists && exists.length > 0) {
-            throw new Error(`Sach ${maSach} da ton tai`);
-        }
+    while (true) {
+      const res = await iterator.next();
 
-        const sach = {
-            docType: 'sach',
-            maSach: maSach,
-            tenSach: tenSach,
-            theLoai: theLoai,
-            tacGia: tacGia,
-            namXuatBan: namXuatBan,
-            soLuong: parseInt(soLuong)
-        };
+      if (res.value && res.value.value.toString()) {
+        const record = {};
+        record.txId = res.value.tx_id;
 
-        await ctx.stub.putState(maSach, Buffer.from(JSON.stringify(sach)));
-        console.info('============= END : Tao Sach Moi ===========');
-        return JSON.stringify(sach);
-    }
-
-    async queryAllSach(ctx) {
-        const startKey = '';
-        const endKey = '';
-        const allResults = [];
-        for await (const {key, value} of ctx.stub.getStateByRange(startKey, endKey)) {
-            const strValue = Buffer.from(value).toString('utf8');
-            let record;
-            try {
-                record = JSON.parse(strValue);
-            } catch (err) {
-                console.log(err);
-                record = strValue;
-            }
-            allResults.push({ Key: key, Record: record });
-        }
-        console.info(allResults);
-        return JSON.stringify(allResults);
-    }
-
-    async updateSach(ctx, maSach, tenSach, theLoai, tacGia, namXuatBan, soLuong) {
-        console.info('============= START : Cap Nhat Sach ===========');
-        const sachAsBytes = await ctx.stub.getState(maSach);
-        if (!sachAsBytes || sachAsBytes.length === 0) {
-            throw new Error(`Sach ${maSach} khong ton tai`);
+        // timestamp: seconds (Long) and nanos
+        try {
+          const seconds = res.value.timestamp.seconds;
+          const nanos = res.value.timestamp.nanos;
+          const secs =
+            typeof seconds.toNumber === "function"
+              ? seconds.toNumber()
+              : Number(seconds);
+          record.timestamp = new Date(
+            secs * 1000 + nanos / 1000000
+          ).toLocaleString();
+        } catch (e) {
+          record.timestamp = new Date().toLocaleString();
         }
 
-        const sach = JSON.parse(sachAsBytes.toString());
-        sach.tenSach = tenSach;
-        sach.theLoai = theLoai;
-        sach.tacGia = tacGia;
-        sach.namXuatBan = namXuatBan;
-        sach.soLuong = parseInt(soLuong);
+        record.isDelete = res.value.is_delete
+          ? res.value.is_delete.toString()
+          : "false";
 
-        await ctx.stub.putState(maSach, Buffer.from(JSON.stringify(sach)));
-        console.info('============= END : Cap Nhat Sach ===========');
-        return JSON.stringify(sach);
-    }
-
-    async deleteSach(ctx, maSach) {
-        console.info('============= START : Xoa Sach ===========');
-        const exists = await ctx.stub.getState(maSach);
-        if (!exists || exists.length === 0) {
-            throw new Error(`Sach ${maSach} khong ton tai`);
+        try {
+          record.data = JSON.parse(res.value.value.toString("utf8"));
+        } catch (err) {
+          record.data = res.value.value.toString("utf8");
         }
-        await ctx.stub.deleteState(maSach);
-        console.info('============= END : Xoa Sach ===========');
-        return `Da xoa sach ${maSach}`;
+
+        allResults.push(record);
+      }
+
+      if (res.done) {
+        await iterator.close();
+        break;
+      }
     }
 
-    async querySachByTheLoai(ctx, theLoai) {
-        console.info('============= START : Tim Sach Theo The Loai ===========');
-        const allSach = JSON.parse(await this.queryAllSach(ctx));
-        const result = allSach.filter(item => item.Record.theLoai === theLoai);
-        console.info(`Tim thay ${result.length} sach thuoc the loai ${theLoai}`);
-        return JSON.stringify(result);
-    }
-
-    async updateSoLuongSach(ctx, maSach, soLuongMoi) {
-        console.info('============= START : Cap Nhat So Luong Sach ===========');
-        const sachAsBytes = await ctx.stub.getState(maSach);
-        if (!sachAsBytes || sachAsBytes.length === 0) {
-            throw new Error(`Sach ${maSach} khong ton tai`);
-        }
-        const sach = JSON.parse(sachAsBytes.toString());
-        const soLuongCu = sach.soLuong;
-        sach.soLuong = parseInt(soLuongMoi);
-
-        await ctx.stub.putState(maSach, Buffer.from(JSON.stringify(sach)));
-        console.info(`Da cap nhat so luong sach ${maSach} tu ${soLuongCu} thanh ${soLuongMoi}`);
-        console.info('============= END : Cap Nhat So Luong Sach ===========');
-        return JSON.stringify(sach);
-    }
+    console.info("============= END : Get History Sach ===========");
+    return JSON.stringify(allResults);
+  }
 }
 
 module.exports = QLSach;
