@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from "react";
-try {
-  const res = await sachAPI.getHistory(sach.maSach);
-  if (res.data && res.data.success) {
-    const raw = res.data.data || [];
-    const normalized = Array.isArray(raw)
-      ? raw.map((r) => normalizeHistoryEntry(r))
-      : [normalizeHistoryEntry(raw)];
-    setHistoryEntries(normalized);
-  } else {
-    setHistoryEntries([]);
-  }
-} catch (err) {
-  console.error("history error", err);
-  setHistoryEntries([]);
-} finally {
-  setHistoryLoading(false);
-}
+import {
+  Container,
+  Row,
+  Col,
+  Table,
+  Button,
+  Form,
+  Modal,
+  Spinner,
+  Badge,
+  InputGroup,
+  FormControl,
+  Alert,
+} from "react-bootstrap";
+import { useAuth } from "../context/AuthContext";
+import { sachAPI } from "../services/api";
+
 const SachTable = () => {
   const { user, isAuthorized } = useAuth();
   const canWrite = isAuthorized(["Admin", "Manager"]);
@@ -44,7 +44,6 @@ const SachTable = () => {
   const [historyEntries, setHistoryEntries] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Load du lieu khi component duoc mount
   useEffect(() => {
     fetchSachs();
   }, []);
@@ -67,17 +66,13 @@ const SachTable = () => {
     }
   };
 
-  // Normalize history entries from backend/chaincode to a consistent shape
   const normalizeHistoryEntry = (raw) => {
     const entry = raw || {};
-    // tx id may come as txId or tx_id
     const txId = entry.txId || entry.tx_id || entry.TxId || "";
 
-    // timestamp may be ISO, locale string, number, or object { seconds, nanos }
     let timestamp = entry.timestamp || entry.time || "";
     try {
       if (timestamp && typeof timestamp === "object") {
-        // try to handle protobuf-like { seconds, nanos }
         const secs =
           typeof timestamp.seconds === "function"
             ? timestamp.seconds()
@@ -89,7 +84,6 @@ const SachTable = () => {
       } else if (typeof timestamp === "number") {
         timestamp = new Date(timestamp).toISOString();
       } else if (typeof timestamp === "string") {
-        // leave as-is (could be ISO or locale); try to parse to ISO if possible
         const d = new Date(timestamp);
         if (!isNaN(d.getTime())) timestamp = d.toISOString();
       }
@@ -97,14 +91,12 @@ const SachTable = () => {
       timestamp = String(entry.timestamp || "");
     }
 
-    // isDelete normalization
     let isDelete = false;
     if (entry.isDelete !== undefined)
       isDelete = entry.isDelete === true || String(entry.isDelete) === "true";
     else if (entry.is_delete !== undefined)
       isDelete = entry.is_delete === true || String(entry.is_delete) === "true";
 
-    // data normalization: try parse if string
     let data = entry.data ?? entry.value ?? entry.Value ?? null;
     if (typeof data === "string") {
       try {
@@ -131,13 +123,11 @@ const SachTable = () => {
           item.Record ? item.Record : item
         );
         setSachs(formattedData);
-        if (formattedData.length === 0) {
+        if (formattedData.length === 0)
           setError(
             `Khong tim thay sach nao thuoc the loai "${filterCategory}"`
           );
-        } else {
-          setError(null);
-        }
+        else setError(null);
       }
     } catch (err) {
       setError("Loi khi tim kiem: " + err.message);
@@ -246,7 +236,6 @@ const SachTable = () => {
     }
   };
 
-  // ---------------------- Import / Export Helpers ----------------------
   const parseCSV = (text) => {
     const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
     if (lines.length === 0) return [];
@@ -318,7 +307,6 @@ const SachTable = () => {
   };
 
   const exportExcel = (data) => {
-    // lightweight Excel export: HTML table saved as .xls
     if (!data || data.length === 0) return;
     const headers = [
       "Ma Sach",
@@ -350,7 +338,6 @@ const SachTable = () => {
   };
 
   const exportPDF = (data) => {
-    // Simple PDF via print: open new window with printable table
     if (!data || data.length === 0) return;
     const headers = [
       "Ma Sach",
@@ -379,13 +366,11 @@ const SachTable = () => {
     const w = window.open("", "_blank");
     w.document.write(html);
     w.document.close();
-    // give it a moment to render then call print
     setTimeout(() => w.print(), 500);
   };
 
   return (
     <Container className="mt-4">
-      {/* Thong bao loi hoac thanh cong */}
       {error && (
         <Alert variant="danger" onClose={() => setError(null)} dismissible>
           {error}
@@ -397,13 +382,11 @@ const SachTable = () => {
         </Alert>
       )}
 
-      {/* Thanh cong cu va Tim kiem */}
       <Row className="mb-3 g-2">
         <Col md={4}>
           <h3 className="text-primary mb-0">Danh Sach Sach</h3>
         </Col>
 
-        {/* Form Tim kiem The loai */}
         <Col md={4}>
           <InputGroup>
             <FormControl
@@ -424,9 +407,6 @@ const SachTable = () => {
         </Col>
 
         <Col md={4} className="text-end">
-          {/* Home button moved to top navigation */}
-
-          {/* Import (only for write roles) and Export controls */}
           {canWrite && (
             <>
               <input
@@ -439,7 +419,6 @@ const SachTable = () => {
                   if (!file) return;
                   const text = await file.text();
                   const rows = parseCSV(text);
-                  // expect header: maSach,tenSach,theLoai,tacGia,namXuatBan,soLuong
                   for (const row of rows) {
                     const item = {
                       maSach: row.maSach || row.MaSach || row["maSach"] || "",
@@ -457,11 +436,8 @@ const SachTable = () => {
                       const exists = sachs.find(
                         (s) => s.maSach === item.maSach
                       );
-                      if (exists) {
-                        await sachAPI.updateSach(item.maSach, item);
-                      } else {
-                        await sachAPI.createSach(item);
-                      }
+                      if (exists) await sachAPI.updateSach(item.maSach, item);
+                      else await sachAPI.createSach(item);
                     } catch (err) {
                       console.error("Import error for", item, err);
                     }
@@ -527,7 +503,6 @@ const SachTable = () => {
         </Col>
       </Row>
 
-      {/* Bang du lieu */}
       {loading ? (
         <div className="text-center py-5">
           <Spinner animation="border" variant="primary" />
@@ -564,7 +539,6 @@ const SachTable = () => {
                     <td>{sach.namXuatBan}</td>
                     <td>{sach.soLuong}</td>
                     <td className="text-center">
-                      {/* Buy button visible only to regular users (role === 'User') */}
                       {user && user.role === "User" && (
                         <Button
                           variant="outline-success"
@@ -579,7 +553,6 @@ const SachTable = () => {
                           Mua
                         </Button>
                       )}
-                      {/* View history (public) */}
                       <Button
                         variant="outline-secondary"
                         size="sm"
@@ -591,10 +564,12 @@ const SachTable = () => {
                           try {
                             const res = await sachAPI.getHistory(sach.maSach);
                             if (res.data && res.data.success) {
-                              setHistoryEntries(res.data.data || []);
-                            } else {
-                              setHistoryEntries([]);
-                            }
+                              const raw = res.data.data || [];
+                              const normalized = Array.isArray(raw)
+                                ? raw.map((r) => normalizeHistoryEntry(r))
+                                : [normalizeHistoryEntry(raw)];
+                              setHistoryEntries(normalized);
+                            } else setHistoryEntries([]);
                           } catch (err) {
                             console.error("history error", err);
                             setHistoryEntries([]);
@@ -603,7 +578,7 @@ const SachTable = () => {
                           }
                         }}
                       >
-                        Lịch sử
+                        Lich su
                       </Button>
                       {canWrite && (
                         <>
@@ -641,7 +616,7 @@ const SachTable = () => {
         </div>
       )}
 
-      {/* Modal Them/Sua Sach (Giu nguyen nhu cu) */}
+      {/* Modal Them/Sua Sach */}
       <Modal
         show={showModal}
         onHide={() => setShowModal(false)}
@@ -804,14 +779,14 @@ const SachTable = () => {
         size="lg"
       >
         <Modal.Header closeButton>
-          <Modal.Title>Lịch sử sách {historyFor || ""}</Modal.Title>
+          <Modal.Title>Lich su sach {historyFor || ""}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {historyLoading ? (
-            <div className="text-center py-3">Đang tải...</div>
+            <div className="text-center py-3">Dang tai...</div>
           ) : (
             <div>
-              <p>Số giao dịch: {historyEntries.length}</p>
+              <p>So giao dich: {historyEntries.length}</p>
               <div style={{ maxHeight: 400, overflow: "auto" }}>
                 <table className="table table-sm">
                   <thead>
@@ -856,7 +831,7 @@ const SachTable = () => {
             variant="secondary"
             onClick={() => setShowHistoryModal(false)}
           >
-            Đóng
+            Dong
           </Button>
         </Modal.Footer>
       </Modal>
