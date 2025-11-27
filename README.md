@@ -139,12 +139,20 @@ npm install recharts
 
 ### 5) Vị trí file & metadata
 
-- Reports lưu tại: `qlsach-backend/reports/`.
-- Metadata tại: `qlsach-backend/reports/index.json`.
-
 ### 6) Bảo mật & Quyền
 
-- Các endpoint tạo/liệt kê/tải báo cáo được bảo vệ bằng middleware `protect` và `authorize('Admin','Manager')`. Đảm bảo JWT và role được cấu hình đúng.
+### 7) Mua sách (Purchase) và Thống kê bán hàng
+
+- **Mua sách (API)**: endpoint `POST /api/purchase` (yêu cầu token) cho phép user mua sách. Body: `{ maSach, quantity }`.
+
+  - Hành vi: kiểm tra tồn kho, cập nhật `soLuong` trên ledger (gọi chaincode `updateSoLuongSach`), và ghi lại giao dịch mua vào `qlsach-backend/data/purchases.json`.
+  - Trả về: `newQty` (tồn kho sau khi mua) và entry metadata.
+
+- **Thống kê bán hàng**: endpoint `GET /api/reports/sales?period=1h|1d|7d` (Admin/Manager) trả về `totalSold` và danh sách `top` sách bán chạy (theo `maSach` và `count`) trong khoảng thời gian chọn.
+
+### 8) Tạo tài khoản Manager (Admin only)
+
+- Endpoint `POST /auth/create-manager` (Admin only) để Admin tạo tài khoản có role `Manager`. Body: `{ username, password, fullName, fabricId, email }`.
 
 ### 7) Nội dung file báo cáo (CSV / XLSX)
 

@@ -91,4 +91,69 @@ router.get(
   }
 );
 
+// POST /api/purchase  -- protected (any logged-in user)
+router.post("/purchase", protect, async (req, res) => {
+  const { maSach, quantity } = req.body;
+  if (!maSach || !quantity)
+    return res
+      .status(400)
+      .json({ success: false, error: "maSach and quantity required" });
+  let conn;
+  try {
+    if (!connectToNetwork) throw new Error("Fabric helper not available");
+    conn = await connectToNetwork(
+      req.user.fabricId || process.env.GUEST_FABRIC_ID
+    );
+    // fetch current book
+    const result = await conn.contract.evaluateTransaction("querySach", maSach);
+    const book = JSON.parse(result.toString());
+    const current = Number(book.soLuong || 0);
+    const q = Number(quantity);
+    if (q <= 0)
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid quantity" });
+    if (current < q)
+      return res
+        .status(400)
+        .json({ success: false, error: "Not enough stock" });
+    const newQty = current - q;
+    await conn.contract.submitTransaction(
+      "updateSoLuongSach",
+      maSach,
+      String(newQty)
+    );
+    // record purchase
+    const buyer =
+      req.user.username || req.user.id || req.user.fabricId || "unknown";
+    const entry = reportService.recordPurchase({ maSach, quantity: q, buyer });
+    res.json({
+      success: true,
+      message: "Purchase recorded",
+      data: { entry, newQty },
+    });
+  } catch (err) {
+    console.error("purchase error", err);
+    res.status(500).json({ success: false, error: err.message });
+  } finally {
+    if (conn && conn.gateway) conn.gateway.disconnect();
+  }
+});
+
+// GET /api/reports/sales?period=1h|1d|7d
+router.get(
+  "/reports/sales",
+  protect,
+  authorize("Admin", "Manager"),
+  (req, res) => {
+    try {
+      const period = req.query.period || "1d";
+      const data = reportService.getTopSellers(period, 10);
+      res.json({ success: true, data });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+);
+
 module.exports = router;

@@ -14,6 +14,7 @@ const {
 } = require("../utils/userUtils");
 
 const router = express.Router();
+const { protect, authorize } = require("../middleware/authMiddleware");
 
 // Ham tao JWT Token
 const generateToken = (id, role, fabricId) => {
@@ -69,6 +70,52 @@ router.post("/register", async (req, res) => {
       .json({ success: false, error: "Loi server noi bo: " + error.message });
   }
 });
+
+// POST /auth/create-manager - Admin only
+router.post(
+  "/create-manager",
+  protect,
+  authorize("Admin"),
+  async (req, res) => {
+    try {
+      const { username, password, fullName, fabricId, email } = req.body;
+      if (!username || !password || !fabricId)
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: "username, password and fabricId required",
+          });
+      const userExists = findUserByUsername(username);
+      if (userExists)
+        return res
+          .status(400)
+          .json({ success: false, error: "Username already exists" });
+      const user = await createUser({
+        username,
+        password,
+        fullName,
+        fabricId,
+        role: "Manager",
+        email,
+      });
+      return res
+        .status(201)
+        .json({
+          success: true,
+          message: "Manager account created",
+          data: {
+            username: user.username,
+            role: user.role,
+            fabricId: user.fabricId,
+          },
+        });
+    } catch (err) {
+      console.error("create-manager error", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+);
 
 // POST /auth/request-reset
 // Dev/testing: require both username and email to match, then reset password to "123456"
@@ -271,12 +318,10 @@ router.post("/change-password", async (req, res) => {
 
     const { oldPassword, newPassword } = req.body;
     if (!oldPassword || !newPassword) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: "oldPassword and newPassword are required",
-        });
+      return res.status(400).json({
+        success: false,
+        error: "oldPassword and newPassword are required",
+      });
     }
 
     // verify old password

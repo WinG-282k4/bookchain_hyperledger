@@ -36,6 +36,9 @@ const SachTable = () => {
     namXuatBan: "",
     soLuong: "",
   });
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [buyQty, setBuyQty] = useState(1);
+  const [buyItem, setBuyItem] = useState(null);
 
   // Load du lieu khi component duoc mount
   useEffect(() => {
@@ -507,6 +510,21 @@ const SachTable = () => {
                     <td>{sach.namXuatBan}</td>
                     <td>{sach.soLuong}</td>
                     <td className="text-center">
+                      {/* Buy button for logged-in users */}
+                      {user && (
+                        <Button
+                          variant="outline-success"
+                          size="sm"
+                          className="me-2"
+                          onClick={() => {
+                            setBuyItem(sach);
+                            setBuyQty(1);
+                            setShowBuyModal(true);
+                          }}
+                        >
+                          Mua
+                        </Button>
+                      )}
                       {canWrite && (
                         <>
                           <Button
@@ -638,6 +656,62 @@ const SachTable = () => {
             </Button>
             <Button variant="primary" type="submit" disabled={loading}>
               {loading ? "Dang xu ly..." : isEditing ? "Cap Nhat" : "Them Moi"}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+
+      {/* Modal Mua Sach */}
+      <Modal
+        show={showBuyModal}
+        onHide={() => setShowBuyModal(false)}
+        backdrop="static"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Mua sach {buyItem?.maSach || ""}</Modal.Title>
+        </Modal.Header>
+        <Form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!buyItem) return;
+            try {
+              setLoading(true);
+              await sachAPI.buySach(buyItem.maSach, buyQty);
+              setSuccess(`Mua ${buyQty} quyển ${buyItem.maSach} thanh cong.`);
+              setShowBuyModal(false);
+              await fetchSachs();
+            } catch (err) {
+              setError(
+                "Loi khi mua: " +
+                  (err.message || err.response?.data?.error || "")
+              );
+            } finally {
+              setLoading(false);
+              setTimeout(() => setSuccess(null), 3000);
+            }
+          }}
+        >
+          <Modal.Body>
+            <p>
+              <strong>{buyItem?.tenSach}</strong>
+            </p>
+            <Form.Group className="mb-3">
+              <Form.Label>So luong mua</Form.Label>
+              <Form.Control
+                type="number"
+                min="1"
+                value={buyQty}
+                onChange={(e) => setBuyQty(Number(e.target.value))}
+                required
+              />
+            </Form.Group>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowBuyModal(false)}>
+              Huy
+            </Button>
+            <Button variant="primary" type="submit" disabled={loading}>
+              {loading ? "Dang xu ly..." : "Mua"}
             </Button>
           </Modal.Footer>
         </Form>

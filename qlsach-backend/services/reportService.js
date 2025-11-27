@@ -12,6 +12,11 @@ try {
 
 const reportsDir = path.join(process.cwd(), "reports");
 if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir);
+const dataDir = path.join(process.cwd(), "data");
+if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
+const purchasesFile = path.join(dataDir, "purchases.json");
+if (!fs.existsSync(purchasesFile))
+  fs.writeFileSync(purchasesFile, "[]", "utf8");
 
 // Helper: query all books from Fabric via provided contract connection
 async function fetchAllBooks(conn) {
@@ -166,6 +171,54 @@ module.exports = {
     } catch (e) {
       return [];
     }
+  },
+
+  // Purchases handling
+  listPurchases() {
+    try {
+      return JSON.parse(fs.readFileSync(purchasesFile, "utf8") || "[]");
+    } catch (e) {
+      return [];
+    }
+  },
+
+  recordPurchase({ maSach, quantity, buyer }) {
+    const arr = this.listPurchases();
+    const entry = {
+      id: String(Date.now()),
+      maSach,
+      quantity: Number(quantity),
+      buyer: buyer || "unknown",
+      ts: Date.now(),
+    };
+    arr.push(entry);
+    fs.writeFileSync(purchasesFile, JSON.stringify(arr, null, 2), "utf8");
+    return entry;
+  },
+
+  // period: '1h'|'1d'|'7d'|'all'
+  getTopSellers(period = "1d", limit = 10) {
+    const now = Date.now();
+    let windowMs = Infinity;
+    if (period === "1h") windowMs = 1000 * 60 * 60;
+    else if (period === "1d") windowMs = 1000 * 60 * 60 * 24;
+    else if (period === "7d") windowMs = 1000 * 60 * 60 * 24 * 7;
+
+    const purchases = this.listPurchases();
+    const cutoff = windowMs === Infinity ? 0 : now - windowMs;
+    const filtered = purchases.filter((p) => p.ts >= cutoff);
+    const agg = {};
+    let totalSold = 0;
+    filtered.forEach((p) => {
+      agg[p.maSach] = (agg[p.maSach] || 0) + Number(p.quantity || 0);
+      totalSold += Number(p.quantity || 0);
+    });
+    const arr = Object.entries(agg).map(([maSach, count]) => ({
+      maSach,
+      count,
+    }));
+    arr.sort((a, b) => b.count - a.count);
+    return { totalSold, top: arr.slice(0, limit) };
   },
 
   getReportFilePath(idOrFilename) {

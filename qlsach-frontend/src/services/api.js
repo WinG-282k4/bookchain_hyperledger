@@ -148,6 +148,12 @@ export const sachAPI = {
   getSachByTheLoai: (theLoai) => api.get(`/sach/theloai/${theLoai}`),
   updateSoLuongSach: (maSach, soLuongMoi) =>
     api.patch(`/sach/${maSach}/soluong`, { soLuongMoi }),
+  buySach: (maSach, quantity) => api.post("/purchase", { maSach, quantity }),
+};
+
+// Sales APIs
+export const salesAPI = {
+  getTopSellers: (period) => api.get(`/reports/sales?period=${period}`),
 };
 
 export default api;
