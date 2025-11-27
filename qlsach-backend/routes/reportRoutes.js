@@ -98,6 +98,15 @@ router.post("/purchase", protect, async (req, res) => {
     return res
       .status(400)
       .json({ success: false, error: "maSach and quantity required" });
+  // Prevent Admins and Managers from making purchases through the API
+  if (req.user && (req.user.role === "Admin" || req.user.role === "Manager")) {
+    return res
+      .status(403)
+      .json({
+        success: false,
+        error: "Admins and Managers cannot perform purchases",
+      });
+  }
   let conn;
   try {
     if (!connectToNetwork) throw new Error("Fabric helper not available");

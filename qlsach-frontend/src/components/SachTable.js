@@ -510,8 +510,8 @@ const SachTable = () => {
                     <td>{sach.namXuatBan}</td>
                     <td>{sach.soLuong}</td>
                     <td className="text-center">
-                      {/* Buy button for logged-in users */}
-                      {user && (
+                      {/* Buy button for regular users only (Admins/Managers cannot buy) */}
+                      {user && !canWrite && (
                         <Button
                           variant="outline-success"
                           size="sm"

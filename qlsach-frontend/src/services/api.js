@@ -133,6 +133,8 @@ export const authAPI = {
   updateProfile: (data) => authClient.put("/auth/me", data),
   changePassword: (oldPassword, newPassword) =>
     authClient.post("/auth/change-password", { oldPassword, newPassword }),
+  // Admin-only: create manager account
+  createManager: (data) => authClient.post("/auth/create-manager", data),
 };
 
 // ===============================================
