@@ -164,5 +164,3 @@ Mặc định prototype hiện tại xuất toàn bộ danh sách sách (full du
 - `tacGia` : Tác giả
 - `namXuatBan` : Năm xuất bản
 - `soLuong` : Số lượng tồn kho (số nguyên)
-
-Lưu ý: nếu bạn muốn thêm các cột khác (ví dụ: ngày thêm, người nhập, lịch sử giao dịch), tôi có thể mở rộng `reportService.generateReport` để thu thập thông tin bổ sung từ ledger hoặc nguồn khác.
