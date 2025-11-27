@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Container, Row, Col, Card, Spinner } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Tabs, Tab } from "react-bootstrap";
 import api from "../services/api";
 import {
   LineChart,
@@ -30,12 +30,29 @@ export default function Dashboard() {
   const [txByHour, setTxByHour] = useState(null);
   const [txHourLoading, setTxHourLoading] = useState(false);
   const [topBooksToday, setTopBooksToday] = useState([]);
+  const [myBooks, setMyBooks] = useState(null);
+  const [myBooksLoading, setMyBooksLoading] = useState(false);
 
   useEffect(() => {
     fetchMetrics();
     fetchTopTransactions();
     fetchTransactionsByHour();
+    fetchMyBooks();
   }, []);
+
+  const fetchMyBooks = async () => {
+    setMyBooksLoading(true);
+    try {
+      const res = await api.get("/my-books");
+      if (res.data && res.data.success) setMyBooks(res.data.data || []);
+      else setMyBooks([]);
+    } catch (err) {
+      console.error("fetchMyBooks", err);
+      setMyBooks([]);
+    } finally {
+      setMyBooksLoading(false);
+    }
+  };
 
   const fetchMetrics = async () => {
     setLoading(true);
@@ -181,142 +198,191 @@ export default function Dashboard() {
 
   return (
     <Container className="mt-4">
-      <Row>
-        <Col md={3}>
-          <KPI title="Total Titles" value={metrics.totalTitles} />
-        </Col>
-        <Col md={3}>
-          <KPI title="Total Inventory" value={metrics.totalInventory} />
-        </Col>
-        <Col md={3}>
-          <KPI
-            title="Top Category"
-            value={(metrics.topCategories[0] || {}).category || "-"}
-          />
-        </Col>
-        <Col md={3}>
-          <KPI
-            title="Top Author"
-            value={(metrics.topAuthors[0] || {}).author || "-"}
-          />
-        </Col>
-      </Row>
+      <Tabs defaultActiveKey="overview" id="dashboard-tabs" className="mb-3">
+        <Tab eventKey="overview" title="Overview">
+          <Row>
+            <Col md={3}>
+              <KPI title="Total Titles" value={metrics.totalTitles} />
+            </Col>
+            <Col md={3}>
+              <KPI title="Total Inventory" value={metrics.totalInventory} />
+            </Col>
+            <Col md={3}>
+              <KPI
+                title="Top Category"
+                value={(metrics.topCategories[0] || {}).category || "-"}
+              />
+            </Col>
+            <Col md={3}>
+              <KPI
+                title="Top Author"
+                value={(metrics.topAuthors[0] || {}).author || "-"}
+              />
+            </Col>
+          </Row>
 
-      <Row className="mt-3">
-        <Col md={12}>
-          <Card>
-            <Card.Body>
-              <h5>Transactions per Hour (today)</h5>
-              {txHourLoading || !txByHour ? (
-                <div className="text-center py-3">
-                  <Spinner animation="border" size="sm" />
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={txByHour}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="hour" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="count"
-                      stroke="#82ca9d"
-                      strokeWidth={2}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+          <Row className="mt-3">
+            <Col md={12}>
+              <Card>
+                <Card.Body>
+                  <h5>Transactions per Hour (today)</h5>
+                  {txHourLoading || !txByHour ? (
+                    <div className="text-center py-3">
+                      <Spinner animation="border" size="sm" />
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <LineChart data={txByHour}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="hour" />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="count"
+                          stroke="#82ca9d"
+                          strokeWidth={2}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
 
-      <Row>
-        <Col md={12} className="mt-3">
-          <Card>
-            <Card.Body>
-              <h5>Top Books Today (transactions)</h5>
-              {!booksChartData || booksChartData.length === 0 ? (
-                <div className="text-center py-3">No transactions today</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart
-                    data={booksChartData}
-                    layout="vertical"
-                    margin={{ left: 20 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={150} />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#82ca9d" />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+          <Row>
+            <Col md={12} className="mt-3">
+              <Card>
+                <Card.Body>
+                  <h5>Top Books Today (transactions)</h5>
+                  {!booksChartData || booksChartData.length === 0 ? (
+                    <div className="text-center py-3">
+                      No transactions today
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart
+                        data={booksChartData}
+                        layout="vertical"
+                        margin={{ left: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" />
+                        <YAxis dataKey="name" type="category" width={150} />
+                        <Tooltip />
+                        <Bar dataKey="value" fill="#82ca9d" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
 
-      <Row className="mt-3">
-        <Col md={6}>
-          <Card>
-            <Card.Body>
-              <h5>Top 10 Authors</h5>
-              <table className="table table-sm">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Author</th>
-                    <th>Count</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(metrics.topAuthors || []).slice(0, 10).map((a, idx) => (
-                    <tr key={a.author + idx}>
-                      <td>{idx + 1}</td>
-                      <td>{a.author}</td>
-                      <td>{a.count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={6}>
-          <Card>
-            <Card.Body>
-              <h5>Top Books by Transactions</h5>
-              {txLoading ? (
-                <div className="text-center py-3">
-                  <Spinner animation="border" size="sm" />
-                </div>
-              ) : (
-                <table className="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Ma Sach</th>
-                      <th>Tx Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(topTx || []).map((t, idx) => (
-                      <tr key={t.maSach}>
-                        <td>{idx + 1}</td>
-                        <td>{t.maSach}</td>
-                        <td>{t.transactions}</td>
+          <Row className="mt-3">
+            <Col md={6}>
+              <Card>
+                <Card.Body>
+                  <h5>Top 10 Authors</h5>
+                  <table className="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Author</th>
+                        <th>Count</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+                    </thead>
+                    <tbody>
+                      {(metrics.topAuthors || []).slice(0, 10).map((a, idx) => (
+                        <tr key={a.author + idx}>
+                          <td>{idx + 1}</td>
+                          <td>{a.author}</td>
+                          <td>{a.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col md={6}>
+              <Card>
+                <Card.Body>
+                  <h5>Top Books by Transactions</h5>
+                  {txLoading ? (
+                    <div className="text-center py-3">
+                      <Spinner animation="border" size="sm" />
+                    </div>
+                  ) : (
+                    <table className="table table-sm">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Ma Sach</th>
+                          <th>Tx Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(topTx || []).map((t, idx) => (
+                          <tr key={t.maSach}>
+                            <td>{idx + 1}</td>
+                            <td>{t.maSach}</td>
+                            <td>{t.transactions}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </Tab>
+
+        <Tab eventKey="mybooks" title="My Purchased Books">
+          <Row className="mt-3">
+            <Col md={12}>
+              <Card>
+                <Card.Body>
+                  {myBooksLoading ? (
+                    <div className="text-center py-3">
+                      <Spinner animation="border" size="sm" />
+                    </div>
+                  ) : !myBooks || myBooks.length === 0 ? (
+                    <div className="text-center py-3">
+                      You have not purchased any books yet.
+                    </div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table table-sm mb-0">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>Ma Sach</th>
+                            <th>So luong so huu</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {myBooks.map((b, idx) => (
+                            <tr key={b.maSach + idx}>
+                              <td>{idx + 1}</td>
+                              <td>{b.maSach}</td>
+                              <td>
+                                {b.soLuongSoHuu || b.soLuong || b.quantity || 0}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </Tab>
+      </Tabs>
     </Container>
   );
 }
