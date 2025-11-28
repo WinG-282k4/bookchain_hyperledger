@@ -3,10 +3,11 @@ import axios from "axios";
 // Cau hinh URL co so API
 // Trong moi truong development, se dung proxy (neu duoc cau hinh trong package.json)
 // Trong moi truong production, su dung dia chi backend
+// Use REACT_APP_API_BASE when provided (recommended). Otherwise default to
+// the VM backend address. Frontend dev server often runs on a different port
+// (e.g. 8006) and must call the backend at 192.168.31.60:3006.
 const API_BASE_URL =
-  process.env.NODE_ENV === "development"
-    ? "/api"
-    : "http://192.168.31.60:3006/api";
+  process.env.REACT_APP_API_BASE || "http://192.168.31.60:3006/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,

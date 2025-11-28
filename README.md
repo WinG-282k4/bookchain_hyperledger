@@ -82,6 +82,22 @@ npm start
 
 Front-end mặc định chạy ở `http://localhost:3000`. Backend mặc định chạy ở `http://localhost:3006` (xem `qlsach-backend/server.js`). Nếu cần, chỉnh URL API trong `qlsach-frontend/src/services/api.js`.
 
+If your backend runs on a VM reachable at `192.168.31.60` and your frontend is served from a different port (for example `8006`), set the following environment variables:
+
+- In backend `.env` (qlsach-backend):
+
+```
+FRONTEND_URL=http://192.168.31.60:8006
+```
+
+- In frontend `.env` (qlsach-frontend):
+
+```
+REACT_APP_API_BASE=http://192.168.31.60:3006/api
+```
+
+This ensures the frontend on `http://192.168.31.60:8006` can reach the API on `http://192.168.31.60:3006` and that password-reset emails include links pointing to the frontend URL.
+
 ---
 
 ## Lời khuyên & Troubleshooting

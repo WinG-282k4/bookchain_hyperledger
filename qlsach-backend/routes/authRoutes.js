@@ -80,12 +80,10 @@ router.post(
     try {
       const { username, password, fullName, fabricId, email } = req.body;
       if (!username || !password || !fabricId)
-        return res
-          .status(400)
-          .json({
-            success: false,
-            error: "username, password and fabricId required",
-          });
+        return res.status(400).json({
+          success: false,
+          error: "username, password and fabricId required",
+        });
       const userExists = findUserByUsername(username);
       if (userExists)
         return res
@@ -99,17 +97,15 @@ router.post(
         role: "Manager",
         email,
       });
-      return res
-        .status(201)
-        .json({
-          success: true,
-          message: "Manager account created",
-          data: {
-            username: user.username,
-            role: user.role,
-            fabricId: user.fabricId,
-          },
-        });
+      return res.status(201).json({
+        success: true,
+        message: "Manager account created",
+        data: {
+          username: user.username,
+          role: user.role,
+          fabricId: user.fabricId,
+        },
+      });
     } catch (err) {
       console.error("create-manager error", err);
       res.status(500).json({ success: false, error: err.message });
@@ -118,7 +114,7 @@ router.post(
 );
 
 // POST /auth/request-reset
-// Dev/testing: require both username and email to match, then reset password to "123456"
+// Production: create a reset token, save it (with expiry), and send email with link
 router.post("/request-reset", async (req, res) => {
   try {
     const { username, email } = req.body;
@@ -129,23 +125,50 @@ router.post("/request-reset", async (req, res) => {
     }
 
     const user = findUserByUsername(username);
-    if (!user || user.email !== email) {
+    if (!user || (user.email || "") !== email) {
       return res
         .status(400)
         .json({ success: false, error: "username and email do not match" });
     }
 
-    // Immediately set password to "123456" for demo/testing
-    const ok = await updatePasswordById(user.id, "123456");
-    if (!ok) {
+    // generate secure token
+    const crypto = require("crypto");
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiry = Date.now() + 60 * 60 * 1000; // 1 hour
+
+    const saved = setResetToken(user.id, token, expiry);
+    if (!saved) {
       return res
         .status(500)
-        .json({ success: false, error: "Could not reset password" });
+        .json({ success: false, error: "Could not create reset token" });
     }
 
-    return res
-      .status(200)
-      .json({ success: true, message: "Password reset to 123456" });
+    // Construct reset URL (frontend should handle /reset?token=...)
+    const frontendBase = process.env.FRONTEND_URL || "http://localhost:3000";
+    const resetUrl = `${frontendBase.replace(/\/$/, "")}/reset?token=${token}`;
+
+    // send email
+    try {
+      const { sendResetEmail } = require("../utils/emailHelper");
+      await sendResetEmail({
+        to: user.email,
+        username: user.username,
+        resetUrl,
+      });
+    } catch (emailErr) {
+      console.error("Failed to send reset email:", emailErr);
+      // still return success to avoid user enumeration, but log the error
+      return res.status(200).json({
+        success: true,
+        message:
+          "If the email is valid, you will receive a reset link shortly. (email send failed in server)",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "If the email is valid, you will receive a reset link shortly.",
+    });
   } catch (error) {
     console.error("Error request-reset:", error);
     return res.status(500).json({ success: false, error: "Server error" });
