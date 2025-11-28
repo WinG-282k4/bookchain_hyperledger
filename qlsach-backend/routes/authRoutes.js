@@ -144,8 +144,24 @@ router.post("/request-reset", async (req, res) => {
     }
 
     // Construct reset URL (frontend should handle /reset?token=...)
-    const frontendBase = process.env.FRONTEND_URL || "http://localhost:3000";
-    const resetUrl = `${frontendBase.replace(/\/$/, "")}/reset?token=${token}`;
+    // Default to VM frontend address instead of localhost so links work from other hosts
+    let frontendBaseRaw =
+      process.env.FRONTEND_URL || "http://192.168.31.60:8006";
+    // If FRONTEND_URL was left as localhost (common dev mistake) and the server
+    // runs on a VM, replace localhost/127.0.0.1 with the VM IP so emails are clickable
+    if (/localhost|127\.0\.0\.1/.test(frontendBaseRaw)) {
+      console.warn(
+        "FRONTEND_URL appears to be localhost — replacing with VM IP for email links"
+      );
+      frontendBaseRaw = frontendBaseRaw.replace(
+        /localhost(:\d+)?|127\.0\.0\.1(:\d+)?/,
+        "192.168.31.60:8006"
+      );
+    }
+    const resetUrl = `${frontendBaseRaw.replace(
+      /\/$/,
+      ""
+    )}/reset?token=${token}`;
 
     // send email
     try {
